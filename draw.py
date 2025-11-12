@@ -34,23 +34,18 @@ class Coil:
         xc = self.Xc
         yc = self.Yc
 
-        # get midpoint of inner radius
-        phi = np.deg2rad(self.angle)
-        xi = xc + r*np.cos(phi)
-        yi = yc + r*np.sin(phi)
-
         # get corner for patches.Rectangle object
-        xr = xi - dz/2 * np.sin(phi)
-        yr = yi - dz/2 * np.cos(phi)
+        xr = xc + r
+        yr = yc - dz/2
         xy = (xr,yr)
 
         # draw patch
         print(xy, dz, dr)
-        rect = Rectangle(xy, dz, dr, angle=0)
+        rect = Rectangle(xy, dr, dz, angle=self.angle, rotation_point=(xc,yc))
         ax.add_patch(rect)
 
         plt.plot(xc,yc,'C0.')
-        plt.plot(xi,yi,'C1.')
+        #plt.plot(xi,yi,'C1.')
 
 # main
 import sys
@@ -65,8 +60,8 @@ fig,axs = plt.subplots()
 for c in coils:
     c.draw(axs)
 
-plt.xlim(-2,2)
-plt.ylim(-2,2)
+plt.xlim(0,2)
+plt.ylim(0,2)
 plt.grid()
 plt.show()
 
