@@ -1,36 +1,65 @@
-import numpy as np
-import matplotlib.pyplot as plt
+#!/usr/bin/env python3
+"""Generate a racetrack coil layout and write it to CSV."""
 
-L = 2
-D = 1
-
-Nm = 4 # coils per mirror part
-Ns = 8 # coils per stellarator half
-
-temp = np.linspace(-L/2,L/2,Nm+1)
-Mx = (temp[1:] + temp[:-1])/2
-
-temp = np.linspace(-np.pi/2, np.pi/2, Ns+1)
-St = (temp[1:] + temp[:-1])/2
-
-points = []
-for x in Mx:
-    points.append([x,D/2])
-
-for t in St:
-    points.append([L/2 + D/2 * np.cos(t), D/2 * np.sin(t)])
-
-for x in Mx:
-    points.append([x,-D/2])
-
-for t in St:
-    points.append([-L/2 - D/2 * np.cos(t), D/2 * np.sin(t)])
+import csv
+import math
+from pathlib import Path
 
 
-print(points)
-x,y = np.transpose(points)
-plt.plot(x,y,'.')
-plt.axis('equal')
-import pdb
-pdb.set_trace()
-plt.show()
+def midpoints(start, stop, count):
+    step = (stop - start) / count
+    return [start + (i + 0.5) * step for i in range(count)]
+
+
+def build_coils(L=2.0, D=1.0, Nm=4, Ns=8):
+    mx = midpoints(-L / 2, L / 2, Nm)
+    ts = midpoints(-math.pi / 2, math.pi / 2, Ns)
+    coils = []
+
+    coils += [{"Xc": x, "Yc": D / 2, "angle": 90.0, "type": "OM"} for x in mx]
+    coils += [
+        {
+            "Xc": L / 2 + (D / 2) * math.cos(t),
+            "Yc": (D / 2) * math.sin(t),
+            "angle": math.degrees(t),
+            "type": "L2",
+        }
+        for t in ts
+    ]
+    coils += [{"Xc": x, "Yc": -D / 2, "angle": -90.0, "type": "OM"} for x in mx]
+    coils += [
+        {
+            "Xc": -L / 2 - (D / 2) * math.cos(t),
+            "Yc": (D / 2) * math.sin(t),
+            "angle": 180.0 - math.degrees(t),
+            "type": "L2",
+        }
+        for t in ts
+    ]
+    return coils
+
+
+def write_csv(coils, path):
+    with path.open("w", newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=["Xc", "Yc", "angle", "type"])
+        writer.writeheader()
+        for row in coils:
+            writer.writerow(
+                {
+                    "Xc": f"{row['Xc']:.6f}",
+                    "Yc": f"{row['Yc']:.6f}",
+                    "angle": f"{row['angle']:.6f}",
+                    "type": row["type"],
+                }
+            )
+
+
+def main():
+    coils = build_coils()
+    out_path = Path(__file__).with_name("test-coil-shapes.csv")
+    write_csv(coils, out_path)
+    print(f"Wrote {len(coils)} coils to {out_path}")
+
+
+if __name__ == "__main__":
+    main()

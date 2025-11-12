@@ -1,25 +1,61 @@
-import numpy as np
+from pathlib import Path
+
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from matplotlib.patches import Rectangle
 
+_COIL_MODELS = None
+
+
+def get_coil_models():
+    """Load coil geometry templates from coil-model.csv once per process."""
+    global _COIL_MODELS
+    if _COIL_MODELS is None:
+        model_path = Path(__file__).with_name('coil-model.csv')
+        df = pd.read_csv(model_path).dropna(how='all')
+        df.columns = df.columns.str.strip()
+        df = df.dropna(subset=['type'])
+        df['type'] = df['type'].apply(lambda x: x.strip().upper() if isinstance(x, str) else x)
+        _COIL_MODELS = {
+            row['type']: {
+                'ID': float(row['ID']),
+                'OD': float(row['OD']),
+                'DZ': float(row['DZ']),
+                'Nr': int(row['Nr']),
+                'Nz': int(row['Nz']),
+            }
+            for _, row in df.iterrows()
+        }
+    return _COIL_MODELS
+
 class Coil:
 
-    def __init__(self, Xc=1,Yc=1, angle=90, ID=0.1, OD=0.2, DZ=0.05, Nr=1, Nz=1):
+    def __init__(self, Xc=1, Yc=1, angle=90, type=None):
         '''
         (Xc,Yc) is the COM of the coil
-        ID,OD are the inner and outer diameters
-        DZ is the axial width of the coil
         angle is of the plane of the coil in degrees, 0 is +xaxis
+        type selects geometry defined in coil-model.csv (e.g. "OM", "L2")
         '''
 
         self.Xc = Xc
         self.Yc = Yc
 
         self.angle = angle
-        self.ID = ID
-        self.OD = OD
-        self.DZ = DZ
+        if not isinstance(type, str):
+            raise ValueError("Coil type string is required (e.g. 'OM', 'L2').")
+        self.type = type.strip().upper()
+
+        models = get_coil_models()
+        if self.type not in models:
+            raise ValueError(f"Unknown coil type '{self.type}'. Add it to coil-model.csv.")
+        model = models[self.type]
+
+        self.ID = float(model['ID'])
+        self.OD = float(model['OD'])
+        self.DZ = float(model['DZ'])
+        self.Nr = int(model['Nr'])
+        self.Nz = int(model['Nz'])
 
     def draw(self, ax):
 
@@ -54,8 +90,6 @@ class Coil:
 # main
 import sys
 fin = sys.argv[1]
-
-import pandas as pd
 df = pd.read_csv(fin).dropna(how='all')
 df.columns = df.columns.str.strip()  # fix headers
 coils = [Coil(**row) for row in df.to_dict('records')]
@@ -68,4 +102,3 @@ plt.xlim(-2,2)
 plt.ylim(-2,2)
 plt.grid()
 plt.show()
-
