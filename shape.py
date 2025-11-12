@@ -11,7 +11,7 @@ def midpoints(start, stop, count):
     return [start + (i + 0.5) * step for i in range(count)]
 
 
-def build_coils(L=2.0, D=1.0, Nm=4, Ns=8):
+def build_coils(L=2.0, D=1.0, Nm=6, Ns=10):
     mx = midpoints(-L / 2, L / 2, Nm)
     ts = midpoints(-math.pi / 2, math.pi / 2, Ns)
     coils = []
