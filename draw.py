@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 
 from matplotlib.patches import Rectangle
 
@@ -40,13 +40,17 @@ class Coil:
         yi = yc + r*np.sin(phi)
 
         # get corner for patches.Rectangle object
-        xr = xi + dz*np.cos(phi)
-        yr = yi + dz*np.sin(phi)
+        xr = xi - dz/2 * np.sin(phi)
+        yr = yi - dz/2 * np.cos(phi)
         xy = (xr,yr)
 
         # draw patch
-        rect = Rectangle(xy, dz, dr, angle=self.angle)
+        print(xy, dz, dr)
+        rect = Rectangle(xy, dz, dr, angle=0)
         ax.add_patch(rect)
+
+        plt.plot(xc,yc,'C0.')
+        plt.plot(xi,yi,'C1.')
 
 # main
 import sys
@@ -60,6 +64,11 @@ coils = [Coil(**row) for row in df.to_dict('records')]
 fig,axs = plt.subplots()
 for c in coils:
     c.draw(axs)
+
+plt.xlim(-2,2)
+plt.ylim(-2,2)
+plt.grid()
+plt.show()
 
 import pdb
 pdb.set_trace()
