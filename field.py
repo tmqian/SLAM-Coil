@@ -72,6 +72,12 @@ class Coil:
         self.current = float(model.get('current', 0.0))
         self._radial_filaments = self._build_midpoints(self.ID / 2, self.OD / 2, self.nr)
         self._axial_filaments = self._build_midpoints(-self.DZ / 2, self.DZ / 2, self.nz)
+        theta = math.radians(self.angle)
+        self._basis_e1 = np.array([math.cos(theta), math.sin(theta), 0.0])
+        self._basis_e2 = np.array([0.0, 0.0, 1.0])
+        self._basis_e3 = np.cross(self._basis_e1, self._basis_e2)
+        self._basis = np.stack([self._basis_e1, self._basis_e2, self._basis_e3], axis=1)
+        self._basis_T = self._basis.T
 
     @staticmethod
     def _build_midpoints(start, stop, count):
@@ -150,19 +156,25 @@ class Coil:
         turns_total = max(1, self.Nr * self.Nz)
         weight = turns_total / num_filaments
         filament_current = total_current * weight
+        basis = self._basis
+        basis_T = self._basis_T
 
         for radius in self._radial_filaments:
             for z_offset in self._axial_filaments:
-                rel = pts - (center + np.array([0.0, 0.0, z_offset]))
-                rho = np.hypot(rel[:, 0], rel[:, 1])
-                z = rel[:, 2]
-                Br, Bz = self._loop_field(radius, rho, z, filament_current)
+                shifted_center = center + z_offset * self._basis_e2
+                rel_global = pts - shifted_center
+                rel_local = rel_global @ basis
+                rho = np.hypot(rel_local[:, 0], rel_local[:, 1])
+                z_local = rel_local[:, 2]
+                Br, Bz = self._loop_field(radius, rho, z_local, filament_current)
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    cos_phi = np.divide(rel[:, 0], rho, out=np.zeros_like(rel[:, 0]), where=rho != 0)
-                    sin_phi = np.divide(rel[:, 1], rho, out=np.zeros_like(rel[:, 1]), where=rho != 0)
-                B_total[:, 0] += Br * cos_phi
-                B_total[:, 1] += Br * sin_phi
-                B_total[:, 2] += Bz
+                    cos_phi = np.divide(rel_local[:, 0], rho, out=np.zeros_like(rel_local[:, 0]), where=rho != 0)
+                    sin_phi = np.divide(rel_local[:, 1], rho, out=np.zeros_like(rel_local[:, 1]), where=rho != 0)
+                B_local = np.zeros_like(rel_local)
+                B_local[:, 0] = Br * cos_phi
+                B_local[:, 1] = Br * sin_phi
+                B_local[:, 2] = Bz
+                B_total += B_local @ basis_T
 
         return B_total[0] if single_point else B_total
 
@@ -273,8 +285,22 @@ ax2.set_ylabel('|B| (T)')
 ax2.set_title('|B| along magnetic axis')
 ax2.grid(True)
 
-# Figure 3: Streamplot zoomed to quarter domain with higher resolution
-STREAM_HALF_WIDTH = PLANE_HALF_WIDTH / 2
-x_stream = (axis_x_mid - STREAM_HALF_WIDTH, axis_x_mid + STREAM_HALF_WIDTH)
-y_stream = (axis_y_mid - STREAM_HALF_WIDTH, axis_y_mid + STREAM_HALF_WIDTH)
+# Figure 3: Streamplot over full domain with higher density
+xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
+    coils, x_range, y_range, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
+)
+speed_stream = np.hypot(BX_stream, BY_stream)
+fig3, ax3 = plt.subplots(figsize=(10, 10))
+stream = ax3.streamplot(
+    xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
+)
+fig3.colorbar(stream.lines, ax=ax3, label='|B| in plane (T)')
+ax3.set_xlim(*x_range)
+ax3.set_ylim(*y_range)
+ax3.set_aspect('equal', adjustable='box')
+ax3.set_title('In-plane B field lines (full domain)')
+ax3.set_xlabel('X (m)')
+ax3.set_ylabel('Y (m)')
+ax3.grid(True)
+
 plt.show()
