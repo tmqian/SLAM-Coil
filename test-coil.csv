@@ -1,4 +1,4 @@
-X0, Y0, angle, ID, OD, DZ, Nr, Nz
+Xc, Yc, angle, ID, OD, DZ, Nr, Nz
 
 0,   1, 2, 90, .45, .90, 10, 4
 0,   1, 1, 90, .45, .90, 10, 4
