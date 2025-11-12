@@ -39,9 +39,13 @@ class Coil:
         yr = yc - dz/2
         xy = (xr,yr)
 
-        # draw patch
+        # draw main cross section
         print(xy, dz, dr)
         rect = Rectangle(xy, dr, dz, angle=self.angle, rotation_point=(xc,yc))
+        ax.add_patch(rect)
+
+        # draw second cross section
+        rect = Rectangle(xy, dr, dz, angle=self.angle+180, rotation_point=(xc,yc), alpha=0.5)
         ax.add_patch(rect)
 
         plt.plot(xc,yc,'C0.')
@@ -60,10 +64,8 @@ fig,axs = plt.subplots()
 for c in coils:
     c.draw(axs)
 
-plt.xlim(0,2)
-plt.ylim(0,2)
+plt.xlim(-2,2)
+plt.ylim(-2,2)
 plt.grid()
 plt.show()
 
-import pdb
-pdb.set_trace()
