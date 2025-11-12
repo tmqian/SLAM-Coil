@@ -33,6 +33,8 @@ def get_coil_models():
                 'Nr': int(row['Nr']),
                 'Nz': int(row['Nz']),
                 'current': float(row.get('current', 0.0)),
+                'nr': int(row.get('nr', row['Nr'])),
+                'nz': int(row.get('nz', row['Nz'])),
             }
             for _, row in df.iterrows()
         }
@@ -65,9 +67,11 @@ class Coil:
         self.DZ = float(model['DZ'])
         self.Nr = int(model['Nr'])
         self.Nz = int(model['Nz'])
+        self.nr = max(1, int(model.get('nr', self.Nr)))
+        self.nz = max(1, int(model.get('nz', self.Nz)))
         self.current = float(model.get('current', 0.0))
-        self._radial_filaments = self._build_midpoints(self.ID / 2, self.OD / 2, self.Nr)
-        self._axial_filaments = self._build_midpoints(-self.DZ / 2, self.DZ / 2, self.Nz)
+        self._radial_filaments = self._build_midpoints(self.ID / 2, self.OD / 2, self.nr)
+        self._axial_filaments = self._build_midpoints(-self.DZ / 2, self.DZ / 2, self.nz)
 
     @staticmethod
     def _build_midpoints(start, stop, count):
@@ -142,7 +146,10 @@ class Coil:
         B_total = np.zeros_like(pts)
         center = np.array([self.Xc, self.Yc, 0.0], dtype=float)
         total_current = self.current if current is None else current
-        filament_current = total_current  # each filament represents one turn carrying full current
+        num_filaments = len(self._radial_filaments) * len(self._axial_filaments)
+        turns_total = max(1, self.Nr * self.Nz)
+        weight = turns_total / num_filaments
+        filament_current = total_current * weight
 
         for radius in self._radial_filaments:
             for z_offset in self._axial_filaments:
@@ -225,8 +232,6 @@ df = pd.read_csv(fin).dropna(how='all')
 df.columns = df.columns.str.strip()  # fix headers
 coils = [Coil(**row) for row in df.to_dict('records')]
 
-fig,axs = plt.subplots()
-
 axis_xy = df[['Xc', 'Yc']].to_numpy()
 axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
 axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
@@ -236,29 +241,40 @@ for coil in coils:
 B_mag = np.linalg.norm(B_total, axis=1)
 s_coord = cumulative_distance(axis_path)
 
-# Contour plot of |B| in axis neighborhood
 axis_x = axis_path[:, 0]
 axis_y = axis_path[:, 1]
 axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
 axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
+
+# Figure 1: contour plot with coil outlines (full domain)
 x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
 y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
-xs, ys, _, _, Bplane = planar_field_grid(coils, x_range, y_range)
-contour = axs.contourf(xs, ys, Bplane, levels=20, cmap='jet', alpha=0.7)
-plt.colorbar(contour, ax=axs, label='|B| in plane (T)')
-
+xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
+fig1, ax1 = plt.subplots(figsize=(9, 9))
+contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
+plt.colorbar(contour, ax=ax1, label='|B| in plane (T)')
 for c in coils:
-    c.draw(axs, color='black', linewidth=1.0)
+    c.draw(ax1, color='black', linewidth=1.0)
+ax1.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
+ax1.legend(loc='upper right')
+ax1.set_xlim(-2, 2)
+ax1.set_ylim(-2, 2)
+ax1.set_aspect('equal', adjustable='box')
+ax1.set_title('Planar |B| with coil outlines')
+ax1.set_xlabel('X (m)')
+ax1.set_ylabel('Y (m)')
+ax1.grid(True)
 
-axs.set_xlim(-2, 2)
-axs.set_ylim(-2, 2)
-axs.grid(True)
-
-fig2, ax2 = plt.subplots()
+# Figure 2: |B| along axis (wider aspect)
+fig2, ax2 = plt.subplots(figsize=(12, 4.5))
 ax2.plot(s_coord, B_mag, lw=2)
 ax2.set_xlabel('Axis distance s (m)')
 ax2.set_ylabel('|B| (T)')
-ax2.set_title('Magnetic field magnitude along axis')
+ax2.set_title('|B| along magnetic axis')
 ax2.grid(True)
 
+# Figure 3: Streamplot zoomed to quarter domain with higher resolution
+STREAM_HALF_WIDTH = PLANE_HALF_WIDTH / 2
+x_stream = (axis_x_mid - STREAM_HALF_WIDTH, axis_x_mid + STREAM_HALF_WIDTH)
+y_stream = (axis_y_mid - STREAM_HALF_WIDTH, axis_y_mid + STREAM_HALF_WIDTH)
 plt.show()
