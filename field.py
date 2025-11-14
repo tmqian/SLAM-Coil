@@ -284,6 +284,7 @@ ax2.set_xlabel('Axis distance s (m)')
 ax2.set_ylabel('|B| (T)')
 ax2.set_title('|B| along magnetic axis')
 ax2.grid(True)
+ax2.set_ylim(bottom=0)
 
 # Figure 3: Streamplot over full domain with higher density
 xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
