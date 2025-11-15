@@ -1,0 +1,21 @@
+name: SLAMtestCoils
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - pip
+  - numpy=2.*        # matches jax >= 0.6 requirement
+  - scipy>=1.14      # optional but safe
+  - matplotlib       # optional plotting
+  - pandas
+
+  - pip:
+      - jax==0.8.0
+      - jaxlib==0.8.0
+      - jaxellip==0.0.1
+      - diffrax==0.4.1
+      - equinox==0.11.3
+      - jaxtyping
+      - opt_einsum
