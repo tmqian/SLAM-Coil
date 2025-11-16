@@ -617,7 +617,12 @@ for i in range(N):
         ax4.plot(x, y, color="darkgray")
 # for legend 
 ax4.plot(x[0], y[0], color="darkgray",alpha = 1, label = "Fieldlines")
-      
+
+x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
+y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
+xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
+contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
+
 for c in coils:
     c.draw(ax4, color='black', linewidth=1.0)
  
