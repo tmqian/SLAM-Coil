@@ -44,7 +44,7 @@ def get_coil_models():
     """Load coil geometry templates from coil-model.csv once per process."""
     global _COIL_MODELS
     if _COIL_MODELS is None:
-        model_path = ('coil-model.csv')
+        model_path = Path(__file__).with_name('coil-model.csv')
         
         df = pd.read_csv(model_path).dropna(how='all')
         df.columns = df.columns.str.strip()
@@ -501,8 +501,7 @@ def magnetic_field_from_coils(coils, points):
 
 # main
 import sys
-#fin = sys.argv[1]
-fin = 'test-coil-shapes.csv'
+fin = sys.argv[1]
 df = pd.read_csv(fin).dropna(how='all')
 
 df.columns = df.columns.str.strip()  # fix headers
@@ -622,6 +621,7 @@ x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
 y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
 xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
 contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
+plt.colorbar(contour, ax=ax4, label='|B| in plane (T)')
 
 for c in coils:
     c.draw(ax4, color='black', linewidth=1.0)
