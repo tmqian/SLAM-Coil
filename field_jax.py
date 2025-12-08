@@ -521,7 +521,7 @@ axis_y = axis_path[:, 1]
 axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
 axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
 
-
+'''
 ## run field line trace 
 ts, path = field_line_trace_xyz(
     x0, y0, z0,
@@ -534,6 +534,7 @@ ts, path = field_line_trace_xyz(
 )
 # most of the path is 'inf', this is because of the diffrax adaptive solver
 
+'''
 
 ### PLOTTING###
 # Figure 1: contour plot with coil outlines (full domain)
@@ -589,7 +590,7 @@ ax3.set_xlabel('X (m)')
 ax3.set_ylabel('Y (m)')
 ax3.grid(True)
 
-
+'''
 # Figure 4: Field line Trace 
 
 fig4, ax4 = plt.subplots(figsize=(9, 9))
@@ -634,6 +635,5 @@ ax4.set_title('Field Line Trace with coil outlines')
 ax4.set_xlabel('X (m)')
 ax4.set_ylabel('Y (m)')
 ax4.grid(True)
-
+'''
 plt.show()
-
