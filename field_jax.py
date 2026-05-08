@@ -13,10 +13,10 @@ from matplotlib.patches import Rectangle
 # START INPUTS # 
 _COIL_MODELS = None
 MU0 = 4 * math.pi * 1e-7
-AXIS_SAMPLES_PER_SEGMENT = 25
+AXIS_SAMPLES_PER_SEGMENT = 80
 GRID_RES_X = 80
 GRID_RES_Y = 80
-PLANE_HALF_WIDTH = 2.0  # meters around the axis center for 2D field view
+PLANE_HALF_WIDTH = 2  # meters around the axis center for 2D field view
 
 ### field line trace 
 # a line 
@@ -251,8 +251,17 @@ class Coil:
         return B_total[0] if points.ndim == 1 else B_total
 
     # 
-    def draw(self, ax, color='C0', linewidth=1.5, show_center=False):
-        """Plot the rectangular coil outline as in draw.py."""
+    def draw(self, ax, color='C0', linewidth=1.5, show_center=False,
+             label=None, add_to_legend=False):
+        """Plot the rectangular coil outline as in draw.py.
+    
+        Parameters
+        ----------
+        label : str or None
+            Legend label for this coil type (e.g. 'L2'). Only used if add_to_legend=True.
+        add_to_legend : bool
+            If True, registers exactly one legend entry per unique label per Axes.
+        """
         dr = (self.OD - self.ID) / 2
         dz = self.DZ
         r = self.ID / 2
@@ -263,6 +272,15 @@ class Coil:
         yr = yc - dz / 2
         xy = (xr, yr)
     
+        # Only attach label once per axes to avoid duplicate legend entries
+        rect_label = None
+        if add_to_legend and label:
+            if not hasattr(ax, "_coil_legend_labels"):
+                ax._coil_legend_labels = set()
+            if label not in ax._coil_legend_labels:
+                rect_label = label
+                ax._coil_legend_labels.add(label)
+    
         rect = Rectangle(
             xy,
             dr,
@@ -272,6 +290,7 @@ class Coil:
             fill=False,
             edgecolor=color,
             linewidth=linewidth,
+            label=rect_label,  # <-- minimal addition
         )
         ax.add_patch(rect)
     
@@ -521,7 +540,7 @@ axis_y = axis_path[:, 1]
 axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
 axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
 
-'''
+
 ## run field line trace 
 ts, path = field_line_trace_xyz(
     x0, y0, z0,
@@ -534,106 +553,209 @@ ts, path = field_line_trace_xyz(
 )
 # most of the path is 'inf', this is because of the diffrax adaptive solver
 
-'''
 
-### PLOTTING###
-# Figure 1: contour plot with coil outlines (full domain)
-x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
-y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
-xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
-fig1, ax1 = plt.subplots(figsize=(9, 9))
-contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
-plt.colorbar(contour, ax=ax1, label='|B| in plane (T)')
-for c in coils:
-    c.draw(ax1, color='black', linewidth=1.0)
-ax1.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
-ax1.legend(loc='upper right')
-ax1.set_xlim(-2, 2)
-ax1.set_ylim(-2, 2)
-ax1.set_aspect('equal', adjustable='box')
-ax1.set_title('Planar |B| with coil outlines')
-ax1.set_xlabel('X (m)')
-ax1.set_ylabel('Y (m)')
-ax1.grid(True)
 
-# Figure 2: |B| along axis (wider aspect)
-fig2, ax2 = plt.subplots(figsize=(12, 4.5))
-ax2.plot(s_coord, B_mag, lw=2)
-ax2.set_xlabel('Axis distance s (m)')
-ax2.set_ylabel('|B| (T)')
-ax2.set_title('|B| along magnetic axis')
-ax2.grid(True)
+Grid_Plot = False
 
-# Figure 3: Streamplot over full domain with higher density
-xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
-    coils, x_range, y_range, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
-)
-speed_stream = np.hypot(BX_stream, BY_stream)
+if Grid_Plot:
 
-## Now needs conversion to numpy: streamplots do not work with JAX
-xs_stream = np.asarray(xs_stream)
-ys_stream = np.asarray(ys_stream)
-BX_stream = np.asarray(BX_stream)
-BY_stream = np.asarray(BY_stream)
-speed_stream = np.asarray(speed_stream)
+    import matplotlib.pyplot as plt
+    from matplotlib.gridspec import GridSpec
+    
+    fig = plt.figure(figsize=(16, 8), constrained_layout=True)
+    
+    # 2 rows × 3 cols:
+    # col0 = contour
+    # col1 = colorbar (skinny)
+    # col2 = right panels
+    gs = GridSpec(
+        2, 3,
+        figure=fig,
+        width_ratios=[1.5, 0.05, 1.0],   
+        height_ratios=[1.0, 1.0],
+    )
+    
+    ax_contour = fig.add_subplot(gs[:, 0])   # left spans both rows
+    cax        = fig.add_subplot(gs[:, 1])   # colorbar spans both rows
+    ax_axis    = fig.add_subplot(gs[0, 2])   # top-right
+    ax_blank   = fig.add_subplot(gs[1, 2])   # bottom-right
+    
+    # -------------------------
+    # Left: planar |B| contour
+    # -------------------------
+    x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
+    y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
+    xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
+    contour = ax_contour.contourf(xs, ys, Bplane, levels=32, cmap="jet", alpha=0.7)
+    cbar = fig.colorbar(contour, cax=cax)
+    cbar.set_label("|B| in plane (T)")
+    
+    coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'OM':'green'}
+    for c in coils:
+        c.draw(
+            ax_contour,
+            color=coil_colors.get(c.type, 'black'),
+            linewidth=2.0,
+            label=f"{c.type} Coil: {c.current:>1,.0f} A",
+            add_to_legend=True
+        )
+    
+    ax_contour.plot(axis_path[:, 0], axis_path[:, 1], "w-", lw=2, label="Magnetic axis")
+    ax_contour.set_xlim(-2, 2)
+    ax_contour.set_ylim(-2, 2)
+    ax_contour.set_aspect("equal", adjustable="box")
+    ax_contour.set_title("Planar |B| with coil outlines")
+    ax_contour.set_xlabel("X (m)")
+    ax_contour.set_ylabel("Y (m)")
+    ax_contour.grid(True)
+    ax_contour.legend(loc="upper right")
+    
+    
+    # -------------------------
+    # Top-right: |B| along axis (total)
+    # -------------------------
+    ax_axis.plot(s_coord, B_mag, lw=2)
+    ax_axis.set_xlabel("Axis distance s (m)")
+    ax_axis.set_ylabel("|B| (T)")
+    ax_axis.set_title("|B| along magnetic axis: Rm = {:.2f}".format(B_mag.max()/B_mag.min()))
+    ax_axis.set_ylim(0, 0.35)
+    ax_axis.grid(True)
 
-fig3, ax3 = plt.subplots(figsize=(10, 10))
-stream = ax3.streamplot(
-    xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
-)
-fig3.colorbar(stream.lines, ax=ax3, label='|B| in plane (T)')
-ax3.set_xlim(*x_range)
-ax3.set_ylim(*y_range)
-ax3.set_aspect('equal', adjustable='box')
-ax3.set_title('In-plane B field lines (full domain)')
-ax3.set_xlabel('X (m)')
-ax3.set_ylabel('Y (m)')
-ax3.grid(True)
+    # =====================================================
+    # Bottom-right: |B| on axis from each COIL TYPE
+    # =====================================================
+    ax_blank.set_title("|B| on axis by coil type")
+    ax_blank.set_xlabel("Axis distance s (m)")
+    ax_blank.set_ylabel("|B| (T)")
+    ax_blank.grid(True)
 
-'''
-# Figure 4: Field line Trace 
+    coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'OM':'green'}
 
-fig4, ax4 = plt.subplots(figsize=(9, 9))
+    # group coils by type
+    coils_by_type = {}
+    for c in coils:
+        coils_by_type.setdefault(c.type, []).append(c)
 
-# plot first two and last two field lines only from x = -1 to x = 1
-for i in range(N):
-    x = path[:, i, 0]
-    y = path[:, i, 1]
+    # compute and plot |B| contribution from each type
+    for ctype, c_list in coils_by_type.items():
+        B_type = np.zeros((len(axis_points), 3))
+        for c in c_list:
+            B_type += c.magnetic_field(axis_points)
 
-    if i in (0, 1, N-1, N-2):
-        # bottom
-        mask_bottom = (jnp.abs(x) < 1) & (y < 0)
-        ax4.plot(jnp.where(mask_bottom, x, jnp.nan),
-                 jnp.where(mask_bottom, y, jnp.nan),
-                 color="darkgray")
+        B_type_mag = np.linalg.norm(B_type, axis=1)
 
-        # top
-        mask_top = (jnp.abs(x) < 1) & (y > 0)
-        ax4.plot(jnp.where(mask_top, x, jnp.nan),
-                 jnp.where(mask_top, y, jnp.nan),
-                 color="darkgray")
+        ax_blank.plot(
+            s_coord,
+            B_type_mag,
+            lw=2,
+            color=coil_colors.get(ctype, 'black'),
+            label=ctype
+        )
 
-    else:
-        ax4.plot(x, y, color="darkgray")
-# for legend 
-ax4.plot(x[0], y[0], color="darkgray",alpha = 1, label = "Fieldlines")
+    ax_blank.legend()
 
-x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
-y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
-xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
-contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
-plt.colorbar(contour, ax=ax4, label='|B| in plane (T)')
+    plt.show()
 
-for c in coils:
-    c.draw(ax4, color='black', linewidth=1.0)
- 
-ax4.legend(loc='upper right')
-ax4.set_xlim(-2, 2)
-ax4.set_ylim(-2, 2)
-ax4.set_aspect('equal', adjustable='box')
-ax4.set_title('Field Line Trace with coil outlines')
-ax4.set_xlabel('X (m)')
-ax4.set_ylabel('Y (m)')
-ax4.grid(True)
-'''
-plt.show()
+else:
+
+    ### PLOTTING###
+    # Figure 1: contour plot with coil outlines (full domain)
+    x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
+    y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
+    xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
+    fig1, ax1 = plt.subplots(figsize=(9, 9))
+    contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
+    plt.colorbar(contour, ax=ax1, label='|B| in plane (T)')
+    for c in coils:
+        c.draw(ax1, color='black', linewidth=1.0)
+    ax1.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
+    ax1.legend(loc='upper right')
+    ax1.set_xlim(-2, 2)
+    ax1.set_ylim(-2, 2)
+    ax1.set_aspect('equal', adjustable='box')
+    ax1.set_title('Planar |B| with coil outlines')
+    ax1.set_xlabel('X (m)')
+    ax1.set_ylabel('Y (m)')
+    ax1.grid(True)
+    
+    # Figure 2: |B| along axis (wider aspect)
+    fig2, ax2 = plt.subplots(figsize=(12, 4.5))
+    ax2.plot(s_coord, B_mag, lw=2)
+    ax2.set_xlabel('Axis distance s (m)')
+    ax2.set_ylabel('|B| (T)')
+    ax2.set_title('|B| along magnetic axis')
+    ax2.grid(True)
+    
+    # Figure 3: Streamplot over full domain with higher density
+    xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
+        coils, x_range, y_range, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
+    )
+    speed_stream = np.hypot(BX_stream, BY_stream)
+    
+    ## Now needs conversion to numpy: streamplots do not work with JAX
+    xs_stream = np.asarray(xs_stream)
+    ys_stream = np.asarray(ys_stream)
+    BX_stream = np.asarray(BX_stream)
+    BY_stream = np.asarray(BY_stream)
+    speed_stream = np.asarray(speed_stream)
+    
+    fig3, ax3 = plt.subplots(figsize=(10, 10))
+    stream = ax3.streamplot(
+        xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
+    )
+    fig3.colorbar(stream.lines, ax=ax3, label='|B| in plane (T)')
+    ax3.set_xlim(*x_range)
+    ax3.set_ylim(*y_range)
+    ax3.set_aspect('equal', adjustable='box')
+    ax3.set_title('In-plane B field lines (full domain)')
+    ax3.set_xlabel('X (m)')
+    ax3.set_ylabel('Y (m)')
+    ax3.grid(True)
+    
+    
+    # Figure 4: Field line Trace 
+    
+    fig4, ax4 = plt.subplots(figsize=(9, 9))
+    
+    # plot first two and last two field lines only from x = -1 to x = 1
+    for i in range(N):
+        x = path[:, i, 0]
+        y = path[:, i, 1]
+    
+        if i in (0, 1, N-1, N-2):
+            # bottom
+            mask_bottom = (jnp.abs(x) < .75) & (y < 0)
+            ax4.plot(jnp.where(mask_bottom, x, jnp.nan),
+                     jnp.where(mask_bottom, y, jnp.nan),
+                     color="darkgray")
+    
+            # top
+            mask_top = (jnp.abs(x) < 1) & (y > 0)
+            ax4.plot(jnp.where(mask_top, x, jnp.nan),
+                     jnp.where(mask_top, y, jnp.nan),
+                     color="darkgray")
+    
+        else:
+            ax4.plot(x, y, color="darkgray")
+    # for legend 
+    ax4.plot(x[0], y[0], color="darkgray",alpha = 1, label = "Fieldlines")
+    
+    x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
+    y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
+    xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
+    contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
+    plt.colorbar(contour, ax=ax4, label='|B| in plane (T)')
+    
+    for c in coils:
+        c.draw(ax4, color='black', linewidth=1.0)
+     
+    ax4.legend(loc='upper right')
+    ax4.set_xlim(-2, 2)
+    ax4.set_ylim(-2, 2)
+    ax4.set_aspect('equal', adjustable='box')
+    ax4.set_title('Field Line Trace with coil outlines')
+    ax4.set_xlabel('X (m)')
+    ax4.set_ylabel('Y (m)')
+    ax4.grid(True)
+    
+    plt.show()
