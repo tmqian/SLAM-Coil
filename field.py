@@ -201,6 +201,20 @@ class Coil:
             Bz[on_axis] = MU0 * current * radius ** 2 / (2 * (radius ** 2 + z[on_axis] ** 2) ** 1.5)
         return Br, Bz
 
+    def get_length(self):
+
+        '''
+        Calculate the coil length.
+        '''
+
+        D_avg = (self.ID + self.OD)/2
+        L_pancake = D_avg * np.pi * self.Nz
+
+        L_coil = L_pancake * self.Nr
+
+        print(f"  {self.type}: {L_coil:.2f} m") 
+        return L_coil
+
 
 def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
     """Linearly interpolate between COM points to approximate the magnetic axis."""
