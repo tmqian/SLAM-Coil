@@ -14,6 +14,7 @@ AXIS_SAMPLES_PER_SEGMENT = 25
 GRID_RES_X = 80
 GRID_RES_Y = 80
 PLANE_HALF_WIDTH = 2.0  # meters around the axis center for 2D field view
+CU_DENSITY = 8960  #kg/m^3
 
 
 def get_coil_models():
@@ -201,7 +202,7 @@ class Coil:
             Bz[on_axis] = MU0 * current * radius ** 2 / (2 * (radius ** 2 + z[on_axis] ** 2) ** 1.5)
         return Br, Bz
 
-    def get_length(self):
+    def get_length(self, print_length=True):
 
         '''
         Calculate the coil length.
@@ -212,8 +213,21 @@ class Coil:
 
         L_coil = L_pancake * self.Nr
 
-        print(f"  {self.type}: {L_coil:.2f} m") 
+        if print_length == True:
+            print(f"  {self.type}: {L_coil:.2f} m") 
         return L_coil
+    
+    def get_volume(self, print_volume=True):
+
+        '''
+        Calculate the maximum coil volume.
+        '''
+
+        V_coil = self.DZ * np.pi * ((self.OD/2)**2 - (self.ID/2)**2)
+
+        if print_volume == True:
+            print(f"  {self.type}: {V_coil:.4f} m^3")
+        return V_coil
 
 
 def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
@@ -271,6 +285,22 @@ axis_x = axis_path[:, 0]
 axis_y = axis_path[:, 1]
 axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
 axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
+
+# Determine total coil lengths, volume, and mass
+num_coils = len(coils)
+coil_lengths = np.zeros(num_coils)
+coil_volumes = np.zeros(num_coils)
+for i in range(num_coils):
+    coil_lengths[i] = coils[i].get_length(False)
+    coil_volumes[i] = coils[i].get_volume(False)
+total_length = np.sum(coil_lengths)
+total_volume = np.sum(coil_volumes)
+total_mass = total_volume * CU_DENSITY
+print('\n')
+print(f"  Total Coil Length: {total_length:.2f} m")
+print(f"  Total Coil Volume: {total_volume:.2f} m^3")
+print(f"  Total Coil Mass: {total_mass:.2f} kg")
+print('\n')
 
 # Figure 1: contour plot with coil outlines (full domain)
 x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
