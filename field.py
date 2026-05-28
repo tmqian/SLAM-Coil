@@ -1,9 +1,14 @@
+'''
+Includes all useful functions and classes for the magnetic field.
+'''
 from pathlib import Path
 import math
 
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 from scipy.special import ellipk, ellipe
 
 from matplotlib.patches import Rectangle
@@ -13,15 +18,17 @@ MU0 = 4 * math.pi * 1e-7
 AXIS_SAMPLES_PER_SEGMENT = 25
 GRID_RES_X = 80
 GRID_RES_Y = 80
-PLANE_HALF_WIDTH = 2.0  # meters around the axis center for 2D field view
+X_RANGE = (-0.4, 0.4)
+Y_RANGE = (-0.4, 0.4)
 CU_DENSITY = 8960  #kg/m^3
+COIL_MODEL_FILE = 'coil_models/coil_model.csv'
 
 
 def get_coil_models():
     """Load coil geometry templates from coil-model.csv once per process."""
     global _COIL_MODELS
     if _COIL_MODELS is None:
-        model_path = Path(__file__).with_name('coil-model.csv')
+        model_path = Path(__file__).parent / COIL_MODEL_FILE
         df = pd.read_csv(model_path).dropna(how='all')
         df.columns = df.columns.str.strip()
         df = df.dropna(subset=['type'])
@@ -87,17 +94,42 @@ class Coil:
         edges = np.linspace(start, stop, count + 1)
         return 0.5 * (edges[1:] + edges[:-1])
 
-    def draw(self, ax, color='C0', linewidth=1.5, show_center=False):
-        """Plot the rectangular coil outline as in draw.py."""
+    def draw(self, ax, color='C0', linewidth=1.5, show_center=False,
+             label=None, add_to_legend=False, length_units='m'):
+        """Plot the rectangular coil outline as in draw.py.
+        
+        Parameters
+        ----------
+        label : str or None
+            Legend label for this coil type (e.g. 'L2'). Only used if add_to_legend=True.
+        add_to_legend : bool
+            If True, registers exactly one legend entry per unique label per Axes."""
+    
         dr = (self.OD - self.ID) / 2
         dz = self.DZ
         r = self.ID / 2
         xc = self.Xc
         yc = self.Yc
 
+        if length_units == 'cm':
+            dr = dr * 100
+            dz = dz * 100
+            r = r * 100
+            xc = xc * 100
+            yc = yc * 100
+
         xr = xc + r
         yr = yc - dz / 2
         xy = (xr, yr)
+
+        # Only attach label once per axes to avoid duplicate legend entries
+        rect_label = None
+        if add_to_legend and label:
+            if not hasattr(ax, "_coil_legend_labels"):
+                ax._coil_legend_labels = set()
+            if label not in ax._coil_legend_labels:
+                rect_label = label
+                ax._coil_legend_labels.add(label)
 
         rect = Rectangle(
             xy,
@@ -108,6 +140,7 @@ class Coil:
             fill=False,
             edgecolor=color,
             linewidth=linewidth,
+            label=rect_label,  # <-- minimal addition
         )
         ax.add_patch(rect)
 
@@ -265,87 +298,198 @@ def planar_field_grid(coils, x_range, y_range, nx=GRID_RES_X, ny=GRID_RES_Y, z_p
     Bmag = np.linalg.norm(B_total, axis=1).reshape(ny, nx)
     return xs, ys, Bx, By, Bmag
 
-# main
-import sys
-fin = sys.argv[1]
-df = pd.read_csv(fin).dropna(how='all')
-df.columns = df.columns.str.strip()  # fix headers
-coils = [Coil(**row) for row in df.to_dict('records')]
 
-axis_xy = df[['Xc', 'Yc']].to_numpy()
-axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
-axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
-B_total = np.zeros((len(axis_points), 3))
-for coil in coils:
-    B_total += coil.magnetic_field(axis_points)
-B_mag = np.linalg.norm(B_total, axis=1)
-s_coord = cumulative_distance(axis_path)
+###########################################
+#    Useful functions for other files.    #
+###########################################
 
-axis_x = axis_path[:, 0]
-axis_y = axis_path[:, 1]
-axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
-axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
+def print_total_coil_params(coils):
+    '''Prints total coil length, volume, and mass.'''
+    num_coils = len(coils)
+    coil_lengths = np.zeros(num_coils)
+    coil_volumes = np.zeros(num_coils)
+    for i in range(num_coils):
+        coil_lengths[i] = coils[i].get_length(False)
+        coil_volumes[i] = coils[i].get_volume(False)
+    total_length = np.sum(coil_lengths)
+    total_volume = np.sum(coil_volumes)
+    total_mass = total_volume * CU_DENSITY
+    print(f"\n  Total Coil Length: {total_length:.2f} m")
+    print(f"  Total Coil Volume: {total_volume:.2f} m^3")
+    print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
-# Determine total coil lengths, volume, and mass
-num_coils = len(coils)
-coil_lengths = np.zeros(num_coils)
-coil_volumes = np.zeros(num_coils)
-for i in range(num_coils):
-    coil_lengths[i] = coils[i].get_length(False)
-    coil_volumes[i] = coils[i].get_volume(False)
-total_length = np.sum(coil_lengths)
-total_volume = np.sum(coil_volumes)
-total_mass = total_volume * CU_DENSITY
-print('\n')
-print(f"  Total Coil Length: {total_length:.2f} m")
-print(f"  Total Coil Volume: {total_volume:.2f} m^3")
-print(f"  Total Coil Mass: {total_mass:.2f} kg")
-print('\n')
 
-# Figure 1: contour plot with coil outlines (full domain)
-x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
-y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
-xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
-fig1, ax1 = plt.subplots(figsize=(9, 9))
-contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
-plt.colorbar(contour, ax=ax1, label='|B| in plane (T)')
-for c in coils:
-    c.draw(ax1, color='black', linewidth=1.0)
-ax1.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
-ax1.legend(loc='upper right')
-ax1.set_xlim(-2, 2)
-ax1.set_ylim(-2, 2)
-ax1.set_aspect('equal', adjustable='box')
-ax1.set_title('Planar |B| with coil outlines')
-ax1.set_xlabel('X (m)')
-ax1.set_ylabel('Y (m)')
-ax1.grid(True)
+def get_coil_info(test_file):
+    '''Returns a list of coils and the magnetic axis
+       path as an array of points in the xy-plane.'''
+    df = pd.read_csv(test_file).dropna(how='all')
+    df.columns = df.columns.str.strip()  # fix headers
+    coils = [Coil(**row) for row in df.to_dict('records')]
+    axis_xy = df[['Xc', 'Yc']].to_numpy()
+    axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
 
-# Figure 2: |B| along axis (wider aspect)
-fig2, ax2 = plt.subplots(figsize=(12, 4.5))
-ax2.plot(s_coord, B_mag, lw=2)
-ax2.set_xlabel('Axis distance s (m)')
-ax2.set_ylabel('|B| (T)')
-ax2.set_title('|B| along magnetic axis')
-ax2.grid(True)
-ax2.set_ylim(bottom=0)
+    return coils, axis_path
 
-# Figure 3: Streamplot over full domain with higher density
-xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
-    coils, x_range, y_range, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
-)
-speed_stream = np.hypot(BX_stream, BY_stream)
-fig3, ax3 = plt.subplots(figsize=(10, 10))
-stream = ax3.streamplot(
-    xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
-)
-fig3.colorbar(stream.lines, ax=ax3, label='|B| in plane (T)')
-ax3.set_xlim(*x_range)
-ax3.set_ylim(*y_range)
-ax3.set_aspect('equal', adjustable='box')
-ax3.set_title('In-plane B field lines (full domain)')
-ax3.set_xlabel('X (m)')
-ax3.set_ylabel('Y (m)')
-ax3.grid(True)
 
-plt.show()
+################
+#     Plots    #
+################
+
+def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', levels=32, extend='neither', coil_colors={}):
+    '''Creates a contour plot of |B| on the xy-plane.
+       Side effects on the inputs fig and ax.'''
+    x_range = X_RANGE
+    y_range = Y_RANGE
+    if length_units == 'cm':
+        x_range = tuple(x * 100 for x in X_RANGE)
+        y_range = tuple(y * 100 for y in Y_RANGE)
+
+    xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, X_RANGE, Y_RANGE)
+    if length_units == 'cm':
+        xs = xs * 100
+        ys = ys * 100
+    if field_units == 'G':
+        Bplane = Bplane * 10000
+
+    contour = ax.contourf(xs, ys, Bplane, levels=levels, cmap='jet', alpha=0.7, extend=extend)
+    fig.colorbar(contour, ax=ax, label=f'|B| in plane ({field_units})')
+
+    for coil in coils:
+        coil.draw(
+        ax,
+        color=coil_colors.get(coil.type, 'black'),
+        linewidth=1.0,
+        label=f"{coil.type} Coil: {coil.current:>1,.0f} A",
+        add_to_legend=True,
+        length_units=length_units
+    )
+
+    if length_units == 'm':
+        ax.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
+    elif length_units == 'cm':
+        ax.plot(axis_path[:, 0]*100, axis_path[:, 1]*100, 'w-', lw=2, label='Magnetic axis')
+    
+    ax.set_xlim(*x_range)
+    ax.set_ylim(*y_range)
+    ax.set_aspect('equal', adjustable='box')
+    if show_labels == True:
+        ax.set_title('Planar |B| with coil outlines')
+        ax.set_xlabel(f'X ({length_units})')
+        ax.set_ylabel(f'Y ({length_units})')
+    ax.grid(True)
+
+
+def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', color='blue', label=''):
+    '''Returns |B| along the magnetic axis.
+       Side effects on the input ax.'''
+    axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
+    B_total = np.zeros((len(axis_points), 3))
+    for coil in coils:
+        B_total += coil.magnetic_field(axis_points)
+    B_mag = np.linalg.norm(B_total, axis=1)
+    s_coord = cumulative_distance(axis_path)
+
+    if length_units == 'cm':
+        s_coord = s_coord * 100
+    if field_units == 'G':
+        B_mag = B_mag * 10000
+
+    if len(s_coord) == 1:
+        ax.plot(s_coord, B_mag, 'o', color=color, label=label)
+    else:
+        ax.plot(s_coord, B_mag, lw=2, color=color, label=label)
+
+    if show_labels == True:
+        ax.set_xlabel(f'Axis distance s ({length_units})')
+        ax.set_ylabel(f'|B| ({field_units})')
+        ax.set_title('|B| along magnetic axis: Rm = {:.2f}'.format(B_mag.max()/B_mag.min()))
+    ax.grid(True)
+    ax.set_ylim(bottom=0)
+
+
+def field_streamplot(fig, ax, coils, show_labels=True, length_units='m', field_units='T', color=''):
+    '''Returns a streamplot over the domain.
+       Side effects on the inputs fig and ax.'''
+    x_range = X_RANGE
+    y_range = Y_RANGE
+    if length_units == 'cm':
+        x_range = tuple(x * 100 for x in X_RANGE)
+        y_range = tuple(y * 100 for y in Y_RANGE)
+
+    xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
+        coils, X_RANGE, Y_RANGE, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
+    )
+
+    if length_units == 'cm':
+        xs_stream = xs_stream * 100
+        ys_stream = ys_stream * 100
+    if field_units == 'G':
+        BX_stream = BX_stream * 10000
+        BY_stream = BY_stream * 10000
+        
+    speed_stream = np.hypot(BX_stream, BY_stream)
+    if color == '':
+        stream = ax.streamplot(
+            xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
+        )
+    else:
+        stream = ax.streamplot(
+            xs_stream, ys_stream, BX_stream, BY_stream, color=color, density=0.5
+        )
+
+    if color == '':
+        fig.colorbar(stream.lines, ax=ax, label=f'|B| in plane ({field_units})')
+        
+    ax.set_xlim(*x_range)
+    ax.set_ylim(*y_range)
+    ax.set_aspect('equal', adjustable='box')
+    if show_labels == True:
+        ax.set_title('In-plane B field lines (full domain)')
+        ax.set_xlabel(f'X ({length_units})')
+        ax.set_ylabel(f'Y ({length_units})')
+    ax.grid(True)
+
+
+def axis_field_plot_by_coil(ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', coil_colors={}):
+    '''Returns |B| along the magnetic axis, split into colors based on coil type.
+       Side effects on the input ax.'''
+    axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
+    s_coord = cumulative_distance(axis_path)
+
+    # group coils by type
+    coils_by_type = {}
+    for c in coils:
+        coils_by_type.setdefault(c.type, []).append(c)
+
+    if length_units == 'cm':
+        s_coord = s_coord * 100
+
+    # compute and plot |B| contribution from each type
+    for ctype, c_list in coils_by_type.items():
+        B_type = np.zeros((len(axis_points), 3))
+        for c in c_list:
+            B_type += c.magnetic_field(axis_points)
+
+        B_type_mag = np.linalg.norm(B_type, axis=1)
+
+        if field_units == 'G':
+            B_type_mag = B_type_mag * 10000
+
+        if len(s_coord) == 1:
+            ax.plot(s_coord, B_type_mag, 'o', color=coil_colors.get(ctype, 'black'), label=ctype)
+        else:
+            ax.plot(
+                s_coord,
+                B_type_mag,
+                lw=2,
+                color=coil_colors.get(ctype, 'black'),
+                label=ctype
+            )
+
+    if show_labels == True:
+        ax.set_title("|B| on axis by coil type")
+        ax.set_xlabel(f"Axis distance s ({length_units})")
+        ax.set_ylabel(f"|B| ({field_units})")
+
+    ax.grid(True)
+    ax.legend()
