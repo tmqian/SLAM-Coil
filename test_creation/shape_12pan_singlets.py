@@ -40,12 +40,12 @@ Inputs
 
 #high field low current 
 straight_types = ["Brown", "OM","OM","OM", "Brown"]
-center_types = ["Blue", "L2block","Blue","L2block", "Blue", "L2block", "Blue"]
+center_types = ["Blue", "12pan","BlueCenter","12panCenter", "BlueCenter", "12pan", "Blue"]
 
 Mirror_Length = 1.5
 Stellerator_Radius = 1
 #filename = "medium_Lm_1p5.csv"
-filename = "racetrack4.csv"
+filename = "../test_files/racetrack_12pan.csv"
 
 #L2 Stell 
 #straight_types = ["Blue","Blue", "OM","OM","OM", "Blue","Blue"]
@@ -87,11 +87,6 @@ def build_coils(L=Mirror_Length, D=Stellerator_Radius):
     dtheta = W / R     # angular width of coil
     delta = dtheta / 2 # half-width in angle
 
-    # Triplet offsets 
-    triplet_offsets_left  = (-2*delta, 0.0, +2*delta)
-    # Right arc must reverse the order so that coil order is correct 
-    triplet_offsets_right = (+2*delta, 0.0, -2*delta)
-
     # ---------------------------------------------------------
     # Straight sections: coils evenly spaced
     # ---------------------------------------------------------
@@ -120,19 +115,10 @@ def build_coils(L=Mirror_Length, D=Stellerator_Radius):
 
     for t_center, typ in zip(centers[::-1], center_types[::-1]):
 
-        if typ == "Blue":
-            add(cx + R*math.cos(t_center),
+        add(cx + R*math.cos(t_center),
                 R*math.sin(t_center),
                 t_center,
-                "Blue")
-
-        else:  # L2 triplet with corrected order
-            for dt in triplet_offsets_right:
-                t = t_center + dt
-                add(cx + R*math.cos(t),
-                    R*math.sin(t),
-                    t,
-                    "L2")
+                f"{typ}")
 
     # ---------------------------------------------------------
     # 3. BOTTOM STRAIGHT
@@ -147,19 +133,10 @@ def build_coils(L=Mirror_Length, D=Stellerator_Radius):
 
     for t_center, typ in zip(centers, center_types):
 
-        if typ == "Blue":
-            add(cx - R*math.cos(t_center),
+        add(cx - R*math.cos(t_center),
                 R*math.sin(t_center),
                 math.pi - t_center,
-                "Blue")
-
-        else:  # L2 triplet with normal ordering
-            for dt in triplet_offsets_left:
-                t = t_center + dt
-                add(cx - R*math.cos(t),
-                    R*math.sin(t),
-                    math.pi - t,
-                    "L2")
+                f"{typ}")
 
     return coils
 
@@ -182,7 +159,7 @@ def write_csv(coils, path):
 
 def main():
     coils = build_coils()
-    out_path = Path(__file__).with_name(filename)
+    out_path = Path(__file__).parent / filename
     write_csv(coils, out_path)
     print(f"Wrote {len(coils)} coils to {out_path}")
 

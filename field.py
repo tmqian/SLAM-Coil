@@ -4,22 +4,29 @@ Includes all useful functions and classes for the magnetic field.
 from pathlib import Path
 import math
 
+import matplotlib
+matplotlib.use('TkAgg')
+
 import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from scipy.special import ellipk, ellipe
+from scipy.signal import find_peaks
 
 from matplotlib.patches import Rectangle
+
+import matplotlib
+matplotlib.use('TkAgg')
 
 _COIL_MODELS = None
 MU0 = 4 * math.pi * 1e-7
 AXIS_SAMPLES_PER_SEGMENT = 25
 GRID_RES_X = 80
 GRID_RES_Y = 80
-X_RANGE = (-0.4, 0.4)
-Y_RANGE = (-0.4, 0.4)
+X_RANGE = (-2, 2)
+Y_RANGE = (-2, 2)
 CU_DENSITY = 8960  #kg/m^3
 COIL_MODEL_FILE = 'coil_models/coil_model.csv'
 
@@ -405,6 +412,7 @@ def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', fi
         ax.set_title('|B| along magnetic axis: Rm = {:.2f}'.format(B_mag.max()/B_mag.min()))
     ax.grid(True)
     ax.set_ylim(bottom=0)
+    return B_mag
 
 
 def field_streamplot(fig, ax, coils, show_labels=True, length_units='m', field_units='T', color=''):
