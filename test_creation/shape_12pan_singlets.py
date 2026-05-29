@@ -45,7 +45,7 @@ center_types = ["Blue", "12pan","BlueCenter","12panCenter", "BlueCenter", "12pan
 Mirror_Length = 1.5
 Stellerator_Radius = 1
 #filename = "medium_Lm_1p5.csv"
-filename = "racetrack_12pan.csv"
+filename = "../test_files/racetrack_12pan.csv"
 
 #L2 Stell 
 #straight_types = ["Blue","Blue", "OM","OM","OM", "Blue","Blue"]
@@ -159,7 +159,7 @@ def write_csv(coils, path):
 
 def main():
     coils = build_coils()
-    out_path = Path(__file__).with_name(filename)
+    out_path = Path(__file__).parent / filename
     write_csv(coils, out_path)
     print(f"Wrote {len(coils)} coils to {out_path}")
 
