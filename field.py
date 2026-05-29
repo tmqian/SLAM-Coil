@@ -18,8 +18,8 @@ MU0 = 4 * math.pi * 1e-7
 AXIS_SAMPLES_PER_SEGMENT = 25
 GRID_RES_X = 80
 GRID_RES_Y = 80
-X_RANGE = (-0.4, 0.4)
-Y_RANGE = (-0.4, 0.4)
+X_RANGE = (-2, 2)
+Y_RANGE = (-2, 2)
 CU_DENSITY = 8960  #kg/m^3
 COIL_MODEL_FILE = 'coil_models/coil_model.csv'
 
