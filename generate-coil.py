@@ -8,8 +8,7 @@ for OD in [0.4, 0.5]:
     for ID in np.arange(0.31, OD - 0.01, 0.01):
         for DZ in np.arange(0.01, 0.1, 0.01):
 
-            coil_models = pd.read_csv('coil_models/coil_model.csv')
-            coil_models.columns = coil_models.columns.str.strip()
+            coil_models = pd.read_csv('coil_models/coil_model-tests.csv')
 
             nr = round((OD - ID) / 0.02, 10)
             nz = round(DZ / 0.01, 10)
@@ -23,7 +22,7 @@ for OD in [0.4, 0.5]:
             coil_models.loc[coil_idx, 'DZ'] = DZ
             coil_models.loc[coil_idx, 'Nr'] = nr
             coil_models.loc[coil_idx, 'Nz'] = nz
-            coil_models.to_csv('coil_models/coil_model.csv', index=False)
+            coil_models.to_csv('coil_models/coil_model-tests.csv', index=False)
 
 
             field._COIL_MODELS = None
