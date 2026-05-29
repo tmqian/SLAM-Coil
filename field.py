@@ -326,14 +326,30 @@ def print_total_coil_params(coils):
     print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
 
-def get_coil_info(test_file):
+def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
     df = pd.read_csv(test_file).dropna(how='all')
     df.columns = df.columns.str.strip()  # fix headers
     coils = [Coil(**row) for row in df.to_dict('records')]
     axis_xy = df[['Xc', 'Yc']].to_numpy()
-    axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
+    axis_path = axis_xy
+    if interpolate == True:
+        axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
+    else:
+        axis_samples_per_segment = 5
+        axis_xy = np.zeros((56, 2))
+        for i in range(9):
+            x = -L/2 + L/8*i
+            axis_xy[i,:] = np.array([x, R])
+            axis_xy[i+28,:] = np.array([-x, -R])
+        for i in range(19):
+            angle = np.pi/2 - np.pi/20 - np.pi/20*i
+            x = L/2 + R*np.cos(angle)
+            y = R*np.sin(angle)
+            axis_xy[i+9,:] = np.array([x, y])
+            axis_xy[i+37,:] = np.array([-x, -y])
+        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
 
     return coils, axis_path
 
@@ -365,7 +381,7 @@ def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', 
         coil.draw(
         ax,
         color=coil_colors.get(coil.type, 'black'),
-        linewidth=1.0,
+        linewidth=1.5,
         label=f"{coil.type} Coil: {coil.current:>1,.0f} A",
         add_to_legend=True,
         length_units=length_units
