@@ -50,6 +50,8 @@ def get_coil_models():
                 'current': float(row.get('current', 0.0)),
                 'nr': int(row.get('nr', row['Nr'])),
                 'nz': int(row.get('nz', row['Nz'])),
+                'parallel': int(row.get('parallel', row['parallel'])),
+                'partitions': int(row.get('partitions', row['partitions']))
             }
             for _, row in df.iterrows()
         }
@@ -93,6 +95,8 @@ class Coil:
         self._basis_e3 = np.cross(self._basis_e1, self._basis_e2)
         self._basis = np.stack([self._basis_e1, self._basis_e2, self._basis_e3], axis=1)
         self._basis_T = self._basis.T
+        self.parallel =  False if int(model['parallel']) == 0 else True
+        self.parallel_partitions = int(model['partitions'])
 
     @staticmethod
     def _build_midpoints(start, stop, count):
@@ -193,6 +197,8 @@ class Coil:
         B_total = np.zeros_like(pts)
         center = np.array([self.Xc, self.Yc, 0.0], dtype=float)
         total_current = self.current if current is None else current
+        if self.parallel == True and self.parallel_partitions != 0:
+            total_current = total_current / self.parallel_partitions
         num_filaments = len(self._radial_filaments) * len(self._axial_filaments)
         turns_total = max(1, self.Nr * self.Nz)
         weight = turns_total / num_filaments

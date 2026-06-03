@@ -13,6 +13,7 @@ def midpoints(start, stop, count):
 
 import math
 import numpy as np
+from racetrack import racetrack
 
 
 
@@ -76,16 +77,8 @@ def build_coils(L=Mirror_Length, D=Stellerator_Radius):
             "type": ctype,
         })
 
-    # ---------------------------------------------------------
-    # L2 coil geometry for angular offsets
-    # ---------------------------------------------------------
-    DZ_L2 = 0.03       # tangential thickness per layer (m)
-    Nz_L2 = 2          # number of layers
-    W = DZ_L2 * Nz_L2  # total tangential width (m) = 0.06 m
-    R = D / 2          # racetrack arc radius = 0.5 m
 
-    dtheta = W / R     # angular width of coil
-    delta = dtheta / 2 # half-width in angle
+    R = D / 2          # racetrack arc radius = 0.5 m
 
     # ---------------------------------------------------------
     # Straight sections: coils evenly spaced
@@ -166,3 +159,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

@@ -3,6 +3,8 @@ import numpy as np
 import field
 from field import Coil, interpolate_axis, AXIS_SAMPLES_PER_SEGMENT, CU_DENSITY
 
+"""This script generates a CSV of possible coil geometries and their properties (G/A, length, mass, etc.) for a single coil design. It iterates over a range of outer diameters (OD), inner diameters (ID), and axial lengths (DZ) to compute the resulting magnetic field strength per ampere (G/A) at the center of the coil, as well as other relevant properties. The results are saved to 'possible-coil.csv' and visualized with plots."""
+
 results = []
 for OD in [0.4, 0.5]:
     for ID in np.arange(0.31, OD - 0.01, 0.01):
