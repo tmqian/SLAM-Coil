@@ -16,7 +16,7 @@ import numpy as np
 
 class racetrack:
     def __init__(self, Mirror_Length, Stellerator_Radius, straight_types, center_types,
-                  extra_R_6pan = 0, extra_R_blue = 0, straight_displacements=None, filename=None):
+                  extra_R_6pan = 0, extra_R_blue = 0, straight_displacements=None, center_displacements=None, filename=None):
         self.Mirror_Length = Mirror_Length
         self.Stellerator_Radius = Stellerator_Radius
         self.straight_types = straight_types
@@ -26,15 +26,20 @@ class racetrack:
         self.filename = filename
         self.coils = None
         self.straight_displacements = straight_displacements or {typ: 0 for typ in straight_types}
+        self.center_displacements = center_displacements or {typ: 0 for typ in center_types}
         self.mirror_shift = 0
 
         for typ in straight_types:
             if typ not in self.straight_displacements:
                 self.straight_displacements[typ] = 0
 
+        for typ in center_types:
+            if typ not in self.center_displacements:
+                self.center_displacements[typ] = 0
+
 
     
-    def build_coils(self, evenlyspace_straight=True, evenlyspace_center=True):
+    def build_coils(self):
         self.coils = []
 
         def add(x, y, angle_rad, ctype):
@@ -110,32 +115,31 @@ class racetrack:
         # ---------------------------------------------------------
         # 4. LEFT ARC
         # ---------------------------------------------------------
-        cx = -self.Mirror_Length/2
 
         for t_center, typ in zip(centers, self.center_types):
 
             if typ == '6pan':
-                add(cx - (self.Stellerator_Radius+self.extra_R_6pan)*math.cos(t_center),
+                add(-cx - (self.Stellerator_Radius+self.extra_R_6pan)*math.cos(t_center),
                         (self.Stellerator_Radius+self.extra_R_6pan)*math.sin(t_center),
                         math.pi - t_center,
                         f"{typ}")
             elif typ == '6panCenter':
-                add(cx - (self.Stellerator_Radius+self.extra_R_6pan)*math.cos(t_center),
+                add(-cx - (self.Stellerator_Radius+self.extra_R_6pan)*math.cos(t_center),
                         (self.Stellerator_Radius+self.extra_R_6pan)*math.sin(t_center),
                         math.pi - t_center,
                         f"{typ}")
             elif typ == 'Blue':
-                add(cx - (self.Stellerator_Radius+self.extra_R_blue)*math.cos(t_center),
+                add(-cx - (self.Stellerator_Radius+self.extra_R_blue)*math.cos(t_center),
                         (self.Stellerator_Radius+self.extra_R_blue)*math.sin(t_center),
                         math.pi - t_center,
                         f"{typ}")
             elif typ == 'BlueCenter':
-                add(cx - (self.Stellerator_Radius+self.extra_R_blue)*math.cos(t_center),
+                add(-cx - (self.Stellerator_Radius+self.extra_R_blue)*math.cos(t_center),
                         (self.Stellerator_Radius+self.extra_R_blue)*math.sin(t_center),
                         math.pi - t_center,
                         f"{typ}")
             else:
-                add(cx - self.Stellerator_Radius*math.cos(t_center),
+                add(-cx - self.Stellerator_Radius*math.cos(t_center),
                         self.Stellerator_Radius*math.sin(t_center),
                         math.pi - t_center,
                         f"{typ}")
@@ -148,7 +152,30 @@ class racetrack:
                 elif coil['Xc'] < 0:
                     coil['Xc'] -= self.straight_displacements[coil['type']]
 
-            
+        #shift coils in curved sections if needed
+        for coil in self.coils:
+            if coil['type'] in self.center_types:
+                X = coil['Xc']
+                Y = coil['Yc']
+                dtheta = math.pi/180 * self.center_displacements[coil['type']]
+                if coil['Xc'] > 0 and coil['Yc'] > 0:
+                    coil['Xc'] = (X - self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) + self.Mirror_Length/2
+                    coil['Yc'] = (X - self.Mirror_Length/2) * math.sin(dtheta) + Y * math.cos(dtheta)
+                    coil['angle'] += self.center_displacements[coil['type']]
+                elif coil['Xc'] < 0 and coil['Yc'] > 0:
+                    coil['Xc'] = (X + self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) - self.Mirror_Length/2
+                    coil['Yc'] = (X + self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
+                    coil['angle'] -= self.center_displacements[coil['type']]
+                elif coil['Xc'] < 0 and coil['Yc'] < 0:
+                    coil['Xc'] = (X + self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) - self.Mirror_Length/2
+                    coil['Yc'] = (X + self.Mirror_Length/2) * math.sin(dtheta) + Y * math.cos(dtheta)
+                    coil['angle'] += self.center_displacements[coil['type']]
+                elif coil['Xc'] > 0 and coil['Yc'] < 0:
+                    coil['Xc'] = (X - self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) + self.Mirror_Length/2
+                    coil['Yc'] = (X - self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
+                    coil['angle'] -= self.center_displacements[coil['type']]
+
+
     def write_csv(self):
         path = Path("./test_creation")/self.filename
         if self.coils is None:

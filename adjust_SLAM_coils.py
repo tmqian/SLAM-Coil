@@ -4,24 +4,25 @@ from racetrack import *
 """Testing ways to make it easer to adjust coil positions"""
 
 straight_types = ["Brown", "OM","OM","OM", "Brown"]
-center_types = ["Blue", "12pan","BlueCenter","12panCenter", "BlueCenter", "12pan", "Blue"]
+center_types = ["Blue", "12pan","BlueCenter", "12panCenter", "BlueCenter", "12pan", "Blue"]
 
-Mirror_Length = 1.5
+Mirror_Length = 1.2
 Stellerator_Radius = 0.5
 #filename = "medium_Lm_1p5.csv"
 filename = "../test_files/racetrack_6pan.csv"
-sd = {'Brown': 0.01, 'OM': 0.02}
+sd = {'Brown': 0.00, 'OM': 0.08}
+cd = {'Blue': 10, '12pan': 10, 'BlueCenter': 10}
 
 rt = racetrack(Mirror_Length, 
                          Stellerator_Radius,
                          straight_types,
                          center_types,
-                         straight_displacements=sd,
+                         straight_displacements=None,center_displacements=None,
                          filename=filename)
 rt.build_coils()
 rt.write_csv()
 
-plot = input("Do you want to plot the coils? (y/n): ")
+plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
     coils, axis_path = get_coil_info(filename[1:], interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
     axis_path = np.vstack([axis_path, axis_path[0:1]]) #close loop
