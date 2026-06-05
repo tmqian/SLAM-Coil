@@ -39,7 +39,7 @@ def get_coil_models():
         df = pd.read_csv(model_path).dropna(how='all')
         df.columns = df.columns.str.strip()
         df = df.dropna(subset=['type'])
-        df['type'] = df['type'].apply(lambda x: x.strip().upper() if isinstance(x, str) else x)
+        df['type'] = df['type'].apply(lambda x: x.strip() if isinstance(x, str) else x)
         _COIL_MODELS = {
             row['type']: {
                 'ID': float(row['ID']),
@@ -72,7 +72,7 @@ class Coil:
         self.angle = angle
         if not isinstance(type, str):
             raise ValueError("Coil type string is required (e.g. 'OM', 'L2').")
-        self.type = type.strip().upper()
+        self.type = type.strip()
 
         models = get_coil_models()
         if self.type not in models:
@@ -332,10 +332,10 @@ def print_total_coil_params(coils):
     print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
 
-def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5):
+def get_coil_info(coil_info, interpolate=True, L=1.5, R=0.5):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
-    df = pd.read_csv(test_file).dropna(how='all')
+    df = pd.read_csv(coil_info).dropna(how='all')
     df.columns = df.columns.str.strip()  # fix headers
     coils = [Coil(**row) for row in df.to_dict('records')]
     axis_xy = df[['Xc', 'Yc']].to_numpy()
@@ -356,9 +356,64 @@ def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5):
             axis_xy[i+9,:] = np.array([x, y])
             axis_xy[i+37,:] = np.array([-x, -y])
         axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
+    axis_path = np.vstack([axis_path, axis_path[0:1]])
 
     return coils, axis_path
 
+def get_axis_path(coils, interpolate=True, L=1.5, R=0.5):
+    '''Returns the magnetic axis path as an array of points in the xy-plane.'''
+    axis_xy = np.array([[coil.Xc, coil.Yc] for coil in coils])
+    if interpolate == True:
+        axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
+    else:
+        axis_samples_per_segment = 5
+        axis_xy = np.zeros((56, 2))
+        for i in range(9):
+            x = -L/2 + L/8*i
+            axis_xy[i,:] = np.array([x, R])
+            axis_xy[i+28,:] = np.array([-x, -R])
+        for i in range(19):
+            angle = np.pi/2 - np.pi/20 - np.pi/20*i
+            x = L/2 + R*np.cos(angle)
+            y = R*np.sin(angle)
+            axis_xy[i+9,:] = np.array([x, y])
+            axis_xy[i+37,:] = np.array([-x, -y])
+        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
+    axis_path = np.vstack([axis_path, axis_path[0:1]])
+    return axis_path
+
+def get_Bmag_on_axis(coils, axis_path, length_units='m', field_units='T'):
+    '''Returns |B| along the magnetic axis.'''
+    axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
+    B_total = np.zeros((len(axis_points), 3))
+    for coil in coils:
+        B_total += coil.magnetic_field(axis_points)
+    B_mag = np.linalg.norm(B_total, axis=1)
+    s_coord = cumulative_distance(axis_path)
+
+    if length_units == 'cm':
+        s_coord = s_coord * 100
+    if field_units == 'G':
+        B_mag = B_mag * 10000
+
+    return B_mag, s_coord
+
+def get_coil_scoord(coils, axis_path, typ):
+    '''Returns the s-coordinate (arc length along axis) for a coil's center position.'''
+    s_coord = []
+    closest_indices = []
+
+    for coil in coils:
+        if coil.type == typ:
+            coil_pos = np.array([coil.Xc, coil.Yc])
+            
+            # Find the closest point on the axis_path to the coil center
+            distances = np.linalg.norm(axis_path - coil_pos, axis=1)
+            closest_idx = np.argmin(distances)
+            s_coord.append(float(cumulative_distance(axis_path)[closest_idx]))
+            closest_indices.append(int(closest_idx))
+    
+    return s_coord, closest_indices
 
 ################
 #     Plots    #
@@ -434,6 +489,7 @@ def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', fi
         ax.set_title('|B| along magnetic axis: Rm = {:.2f}'.format(B_mag.max()/B_mag.min()))
     ax.grid(True)
     ax.set_ylim(bottom=0)
+
     return B_mag
 
 

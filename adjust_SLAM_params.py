@@ -5,7 +5,7 @@ radius have on the coil ripple.
 from field import *
 
 fin = sys.argv[1]
-coils, axis_path = get_coil_info(fin, interpolate=False, L=1.5, R=0.42)
+coils, axis_path = get_coil_info(fin, interpolate=True, L=1.5, R=0.42)
 
 coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'BLUECENTER':'red', 'OM':'green', '12PAN':'black', '12PANCENTER':'gold', '6PAN':'black', '6PANCENTER':'gold'}
 

@@ -13,7 +13,6 @@ def midpoints(start, stop, count):
 
 import math
 import numpy as np
-from racetrack import racetrack
 
 
 
@@ -43,7 +42,7 @@ Inputs
 straight_types = ["Brown", "OM","OM","OM", "Brown"]
 center_types = ["Blue", "12pan","BlueCenter","12panCenter", "BlueCenter", "12pan", "Blue"]
 
-Mirror_Length = 1.5
+Mirror_Length = 1.2
 Stellerator_Radius = 1
 #filename = "medium_Lm_1p5.csv"
 filename = "../test_files/racetrack_12pan.csv"

@@ -1,4 +1,4 @@
-from field import *
+
 from racetrack import *
 
 """Testing ways to make it easer to adjust coil positions"""
@@ -6,18 +6,18 @@ from racetrack import *
 straight_types = ["Brown", "OM","OM","OM", "Brown"]
 center_types = ["Blue", "12pan","BlueCenter", "12panCenter", "BlueCenter", "12pan", "Blue"]
 
-Mirror_Length = 1.2
+Mirror_Length = 1.5
 Stellerator_Radius = 0.5
 #filename = "medium_Lm_1p5.csv"
 filename = "../test_files/racetrack_6pan.csv"
-sd = {'Brown': 0.00, 'OM': 0.08}
-cd = {'Blue': 10, '12pan': 10, 'BlueCenter': 10}
+sd = {'Brown': 0.00, 'OM': 0.0}
+cd = {'Blue': 0, '12pan': 0, 'BlueCenter': 0}
 
-rt = racetrack(Mirror_Length, 
+rt = Racetrack(Mirror_Length, 
                          Stellerator_Radius,
                          straight_types,
                          center_types,
-                         straight_displacements=None,center_displacements=None,
+                         straight_displacements=None,center_displacements=cd,
                          filename=filename)
 rt.build_coils()
 rt.write_csv()
@@ -25,9 +25,9 @@ rt.write_csv()
 plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
     coils, axis_path = get_coil_info(filename[1:], interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
-    axis_path = np.vstack([axis_path, axis_path[0:1]]) #close loop
 
-    coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'BLUECENTER':'red', 'OM':'green', '12PAN':'black', '12PANCENTER':'gold', '6PAN':'black', '6PANCENTER':'gold'}
+
+    coil_colors = {'Brown':'brown', 'L2':'gold', 'Blue':'blue', 'BlueCenter':'red', 'OM':'green', '12pan':'black', '12panCenter':'gold', '6pan':'black', '6panCenter':'gold'}
 
     # Array of 3 plots using GridSpec
     fig = plt.figure(figsize=(16, 8), constrained_layout=True)
@@ -56,7 +56,7 @@ if plot.lower() == 'y':
     # -------------------------
     # Top-right: |B| along axis (total)
     # -------------------------
-    B_mag = axis_field_plot(ax_axis, coils, axis_path)
+    axis_field_plot(ax_axis, coils, axis_path)
 
     # =====================================================
     # Bottom-right: |B| on axis from each COIL TYPE
