@@ -336,7 +336,7 @@ def print_total_coil_params(coils):
 def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
-    df = pd.read_csv(coil_info).dropna(how='all')
+    df = pd.read_csv(test_file).dropna(how='all')
     df.columns = df.columns.str.strip()  # fix headers
     coils = [Coil(**row) for row in df.to_dict('records')]
     axis_xy = df[['Xc', 'Yc']].to_numpy()
