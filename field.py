@@ -333,7 +333,7 @@ def print_total_coil_params(coils):
     print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
 
-def get_coil_info(coil_info, interpolate=True, L=1.5, R=0.5):
+def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
     df = pd.read_csv(coil_info).dropna(how='all')
@@ -356,8 +356,7 @@ def get_coil_info(coil_info, interpolate=True, L=1.5, R=0.5):
             y = R*np.sin(angle)
             axis_xy[i+9,:] = np.array([x, y])
             axis_xy[i+37,:] = np.array([-x, -y])
-        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
-    axis_path = np.vstack([axis_path, axis_path[0:1]])
+        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment, loop = loop)
 
     return coils, axis_path
 
