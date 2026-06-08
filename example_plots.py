@@ -1,13 +1,12 @@
-'''
-Showcases an arrangement of plots.
-'''
-from field import *
+# pyright: standard
+# Showcases an arrangement of plots.
 
+from field import *
 
 fin = sys.argv[1]
 coils, axis_path = get_coil_info(fin)
 
-coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'OM':'green'}
+coil_colors = {"BROWN": "brown", "L2": "gold", "BLUE": "blue", "OM": "green"}
 
 fig1, ax1 = plt.subplots(figsize=(9, 9))
 contour_plot(fig1, ax1, coils, axis_path, coil_colors=coil_colors)
@@ -26,16 +25,11 @@ fig = plt.figure(figsize=(16, 8), constrained_layout=True)
 # col0 = contour
 # col1 = colorbar (skinny)
 # col2 = right panels
-gs = GridSpec(
-    2, 3,
-    figure=fig,
-    width_ratios=[1.5, 0.05, 1.0],   
-    height_ratios=[1.0, 1.0]
-)
+gs = GridSpec(2, 3, figure=fig, width_ratios=[1.5, 0.05, 1.0], height_ratios=[1.0, 1.0])
 
-ax_contour = fig.add_subplot(gs[:, :2])   # left spans both rows
-ax_axis    = fig.add_subplot(gs[0, 2])   # top-right
-ax_blank   = fig.add_subplot(gs[1, 2])   # bottom-right
+ax_contour = fig.add_subplot(gs[:, :2])  # left spans both rows
+ax_axis = fig.add_subplot(gs[0, 2])  # top-right
+ax_blank = fig.add_subplot(gs[1, 2])  # bottom-right
 
 # -------------------------
 # Left: planar |B| contour

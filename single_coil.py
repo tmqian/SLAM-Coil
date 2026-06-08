@@ -1,6 +1,7 @@
-'''
-Determines useful information from a single coil with 1 A through it.
-'''
+# pyright: standard
+# Determines useful information from a single coil with 1 A through it.
+
+
 from field import *
 
 fin = sys.argv[1]

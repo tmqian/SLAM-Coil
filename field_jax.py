@@ -1,3 +1,4 @@
+# pyright: standard
 # ---------- Just like field.py, but vectorized coils so we can quickly trace field lines ----------
 from pathlib import Path
 import math
@@ -9,8 +10,7 @@ from jaxellip import ellipk, ellipe
 import jax
 from matplotlib.patches import Rectangle
 
-
-# START INPUTS # 
+# START INPUTS #
 _COIL_MODELS = None
 MU0 = 4 * math.pi * 1e-7
 AXIS_SAMPLES_PER_SEGMENT = 80
@@ -18,16 +18,15 @@ GRID_RES_X = 80
 GRID_RES_Y = 80
 PLANE_HALF_WIDTH = 2  # meters around the axis center for 2D field view
 
-### field line trace 
-# a line 
-N = 9 # two on both side will be masked to show termination 
-#y0 = np.linspace(.3,.7,N) # trace starts to take longer, too close to coils
-y0 = np.linspace(.35,.65,N) 
-z0 =  np.ones_like(y0) *0
-x0 =  np.ones_like(y0) *0
+### field line trace
+# a line
+N = 9  # two on both side will be masked to show termination
+# y0 = np.linspace(.3,.7,N) # trace starts to take longer, too close to coils
+y0 = np.linspace(0.35, 0.65, N)
+z0 = np.ones_like(y0) * 0
+x0 = np.ones_like(y0) * 0
 
 # END INPUTS #
-
 
 
 # ================================================================
@@ -40,26 +39,29 @@ x0 =  np.ones_like(y0) *0
 #   Load Coil Templates (outside JIT; runs once)
 # ================================================================
 
+
 def get_coil_models():
     """Load coil geometry templates from coil-model.csv once per process."""
     global _COIL_MODELS
     if _COIL_MODELS is None:
-        model_path = Path(__file__).with_name('coil-model.csv')
-        
-        df = pd.read_csv(model_path).dropna(how='all')
+        model_path = Path(__file__).with_name("coil-model.csv")
+
+        df = pd.read_csv(model_path).dropna(how="all")
         df.columns = df.columns.str.strip()
-        df = df.dropna(subset=['type'])
-        df['type'] = df['type'].apply(lambda x: x.strip().upper() if isinstance(x, str) else x)
+        df = df.dropna(subset=["type"])
+        df["type"] = df["type"].apply(
+            lambda x: x.strip().upper() if isinstance(x, str) else x
+        )
         _COIL_MODELS = {
-            row['type']: {
-                'ID': float(row['ID']),
-                'OD': float(row['OD']),
-                'DZ': float(row['DZ']),
-                'Nr': int(row['Nr']),
-                'Nz': int(row['Nz']),
-                'current': float(row.get('current', 0.0)),
-                'nr': int(row.get('nr', row['Nr'])),
-                'nz': int(row.get('nz', row['Nz'])),
+            row["type"]: {
+                "ID": float(row["ID"]),
+                "OD": float(row["OD"]),
+                "DZ": float(row["DZ"]),
+                "Nr": int(row["Nr"]),
+                "Nz": int(row["Nz"]),
+                "current": float(row.get("current", 0.0)),
+                "nr": int(row.get("nr", row["Nr"])),
+                "nz": int(row.get("nz", row["Nz"])),
             }
             for _, row in df.iterrows()
         }
@@ -67,8 +69,9 @@ def get_coil_models():
 
 
 # ================================================================
-#   JAX midpoint helper, used when initilizing Coils 
+#   JAX midpoint helper, used when initilizing Coils
 # ================================================================
+
 
 def build_midpoints(start, stop, count):
     start = jnp.asarray(start, float)
@@ -83,31 +86,35 @@ def build_midpoints(start, stop, count):
 #   JAX Loop Field (Br, Bz) for thin circular loop
 # ================================================================
 
+
 def loop_field(radius, rho, z, current):
     radius = jnp.asarray(radius, float)
     rho = jnp.asarray(rho, float)
     z = jnp.asarray(z, float)
 
-    denom = (radius + rho)**2 + z**2
+    denom = (radius + rho) ** 2 + z**2
     k_sq = jnp.where(denom == 0, 0.0, 4 * radius * rho / denom)
 
     K = ellipk(k_sq)
     E = ellipe(k_sq)
     common = MU0 * current / (2 * math.pi * jnp.sqrt(denom))
 
-    denom2 = (radius - rho)**2 + z**2
+    denom2 = (radius - rho) ** 2 + z**2
     denom2 = jnp.where(denom2 == 0, jnp.finfo(float).eps, denom2)
 
-    Br = common * z / jnp.where(rho == 0, 1, rho) * (
-        -K + (radius**2 + rho**2 + z**2) / denom2 * E
+    Br = (
+        common
+        * z
+        / jnp.where(rho == 0, 1, rho)
+        * (-K + (radius**2 + rho**2 + z**2) / denom2 * E)
     )
 
-    Bz = common * (K + (radius**2 - rho**2 - z**2)/denom2 * E)
+    Bz = common * (K + (radius**2 - rho**2 - z**2) / denom2 * E)
 
     # On-axis fix
     Bz = jnp.where(
         rho == 0,
-        MU0 * current * radius**2 / (2 * (radius**2 + z**2)**1.5),
+        MU0 * current * radius**2 / (2 * (radius**2 + z**2) ** 1.5),
         Bz,
     )
 
@@ -117,6 +124,7 @@ def loop_field(radius, rho, z, current):
 # ================================================================
 #   Coil Class with (PyTree)
 # ================================================================
+
 
 @jax.tree_util.register_pytree_node_class
 class Coil:
@@ -142,8 +150,8 @@ class Coil:
         self.current = m["current"]
 
         # midpoints
-        self.radial_filaments = build_midpoints(self.ID/2, self.OD/2, self.nr)
-        self.axial_filaments  = build_midpoints(-self.DZ/2, self.DZ/2, self.nz)
+        self.radial_filaments = build_midpoints(self.ID / 2, self.OD / 2, self.nr)
+        self.axial_filaments = build_midpoints(-self.DZ / 2, self.DZ / 2, self.nz)
 
         # basis vectors
         theta = math.radians(self.angle)
@@ -153,7 +161,6 @@ class Coil:
 
         self.basis = jnp.stack([e1, e2, e3], axis=1)
         self.basis_T = self.basis.T
-
 
     # -------------------------
     # PyTree: flatten/unflatten
@@ -183,9 +190,16 @@ class Coil:
     @classmethod
     def tree_unflatten(cls, aux, children):
         (
-            Xc, Yc, angle,
-            ID, OD, DZ,
-            Nr, Nz, nr, nz,
+            Xc,
+            Yc,
+            angle,
+            ID,
+            OD,
+            DZ,
+            Nr,
+            Nz,
+            nr,
+            nz,
             current,
             radial_filaments,
             axial_filaments,
@@ -196,11 +210,10 @@ class Coil:
         # We reconstruct manually
         obj = cls(float(Xc), float(Yc), float(angle), aux)
         obj.radial_filaments = radial_filaments
-        obj.axial_filaments  = axial_filaments
+        obj.axial_filaments = axial_filaments
         obj.basis = basis
         obj.basis_T = basis_T
         return obj
-
 
     # ===========================================================
     #   JAX-vectorized Magnetic Field Calculation
@@ -230,31 +243,38 @@ class Coil:
         I_fil = I * weight
 
         def field_of_filament(radius, zoff):
-            shifted = center + zoff * basis[:,1]
+            shifted = center + zoff * basis[:, 1]
             rel = pts - shifted
             rel_local = rel @ basis
 
-            rho = jnp.hypot(rel_local[:,0], rel_local[:,1])
-            zloc = rel_local[:,2]
+            rho = jnp.hypot(rel_local[:, 0], rel_local[:, 1])
+            zloc = rel_local[:, 2]
 
             Br, Bz = loop_field(radius, rho, zloc, I_fil)
 
-            cos_phi = jnp.where(rho > 0, rel_local[:,0]/rho, 0)
-            sin_phi = jnp.where(rho > 0, rel_local[:,1]/rho, 0)
+            cos_phi = jnp.where(rho > 0, rel_local[:, 0] / rho, 0)
+            sin_phi = jnp.where(rho > 0, rel_local[:, 1] / rho, 0)
 
-            B_loc = jnp.stack([Br*cos_phi, Br*sin_phi, Bz], axis=1)
+            B_loc = jnp.stack([Br * cos_phi, Br * sin_phi, Bz], axis=1)
             return B_loc @ basis_T
 
-        B_all = jax.vmap(field_of_filament)(Rf, Zf)   # (F, N, 3)
-        B_total = jnp.sum(B_all, axis=0)              # (N, 3)
+        B_all = jax.vmap(field_of_filament)(Rf, Zf)  # (F, N, 3)
+        B_total = jnp.sum(B_all, axis=0)  # (N, 3)
 
         return B_total[0] if points.ndim == 1 else B_total
 
-    # 
-    def draw(self, ax, color='C0', linewidth=1.5, show_center=False,
-             label=None, add_to_legend=False):
+    #
+    def draw(
+        self,
+        ax,
+        color="C0",
+        linewidth=1.5,
+        show_center=False,
+        label=None,
+        add_to_legend=False,
+    ):
         """Plot the rectangular coil outline as in draw.py.
-    
+
         Parameters
         ----------
         label : str or None
@@ -267,11 +287,11 @@ class Coil:
         r = self.ID / 2
         xc = self.Xc
         yc = self.Yc
-    
+
         xr = xc + r
         yr = yc - dz / 2
         xy = (xr, yr)
-    
+
         # Only attach label once per axes to avoid duplicate legend entries
         rect_label = None
         if add_to_legend and label:
@@ -280,7 +300,7 @@ class Coil:
             if label not in ax._coil_legend_labels:
                 rect_label = label
                 ax._coil_legend_labels.add(label)
-    
+
         rect = Rectangle(
             xy,
             dr,
@@ -293,7 +313,7 @@ class Coil:
             label=rect_label,  # <-- minimal addition
         )
         ax.add_patch(rect)
-    
+
         rect_opposite = Rectangle(
             xy,
             dr,
@@ -303,13 +323,14 @@ class Coil:
             fill=False,
             edgecolor=color,
             linewidth=linewidth,
-            linestyle='--',
+            linestyle="--",
         )
         ax.add_patch(rect_opposite)
-    
+
         if show_center:
-            ax.plot(xc, yc, marker='o', color=color, ms=3)
-    
+            ax.plot(xc, yc, marker="o", color=color, ms=3)
+
+
 def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
     """Linearly interpolate between COM points to approximate the magnetic axis."""
     points = jnp.asarray(points, dtype=float)
@@ -331,7 +352,9 @@ def cumulative_distance(points):
     return jnp.concatenate((jnp.array([0.0]), jnp.cumsum(seg_lengths)))
 
 
-def planar_field_grid(coils, x_range, y_range, nx=GRID_RES_X, ny=GRID_RES_Y, z_plane=0.0):
+def planar_field_grid(
+    coils, x_range, y_range, nx=GRID_RES_X, ny=GRID_RES_Y, z_plane=0.0
+):
     """Compute B-field vectors on a uniform XY grid at a fixed z-plane."""
     xs = jnp.linspace(*x_range, nx)
     ys = jnp.linspace(*y_range, ny)
@@ -354,19 +377,22 @@ from diffrax import (
     PIDController,
     diffeqsolve,
     Tsit5,
-    Event,     # IMPORTANT: diffrax 0.7.0 event API
+    Event,  # IMPORTANT: diffrax 0.7.0 event API
 )
 
 
 def field_line_trace_xyz(
-    x0, y0, z0,
+    x0,
+    y0,
+    z0,
     *,
-    field,                         # object with .magnetic_field(pts) -> (N,3)
+    field,  # object with .magnetic_field(pts) -> (N,3)
     params=None,
     source_grid=None,
     s_total=1.0,
     direction="forward",
-    rtol=1e-8, atol=1e-8,
+    rtol=1e-8,
+    atol=1e-8,
     min_step_size=1e-8,
     max_steps_per_meter=20000,
     bounds_X=(-jnp.inf, jnp.inf),
@@ -395,23 +421,22 @@ def field_line_trace_xyz(
     z0 = jnp.asarray(z0)
     assert x0.shape == y0.shape == z0.shape
 
-    S = x0.shape         # logical seed shape
-    N = x0.size          # flatten → N seeds
+    S = x0.shape  # logical seed shape
+    N = x0.size  # flatten → N seeds
 
     # Component-first state: (3, N)
     y_init = jnp.stack([x0.ravel(), y0.ravel(), z0.ravel()], axis=0)
 
-
     # ---------- ODE RHS ----------
     def odefun(s, state, args):
         X, Y, Z = state  # each (N,)
-        pts = jnp.stack([X, Y, Z], axis=-1)   # (N,3)
+        pts = jnp.stack([X, Y, Z], axis=-1)  # (N,3)
 
-        #B = field.magnetic_field(pts)        # (N,3)
-        #B = field(pts)        # (N,3)
-        B = magnetic_field_from_coils(field,pts)
-        
-        Bn = jnp.linalg.norm(B, axis=-1)     # (N,)
+        # B = field.magnetic_field(pts)        # (N,3)
+        # B = field(pts)        # (N,3)
+        B = magnetic_field_from_coils(field, pts)
+
+        Bn = jnp.linalg.norm(B, axis=-1)  # (N,)
 
         if eps_B > 0:
             Bn = jnp.maximum(Bn, eps_B)
@@ -424,25 +449,25 @@ def field_line_trace_xyz(
 
         return jnp.stack([dX, dY, dZ], axis=0)  # (3,N)
 
-
     term = ODETerm(odefun)
     stepsize = PIDController(rtol=rtol, atol=atol, dtmin=jnp.abs(min_step_size))
     save_steps = SaveAt(steps=True)
-
 
     # ---------- termination event (bounds) ----------
     # DIFFRAX 0.7.0 REQUIRES: return scalar float, not bool.
     def cond_fn(t, y, args, **kw):
         X, Y, Z = y
         out = (
-            (X < bounds_X[0]) | (X > bounds_X[1]) |
-            (Y < bounds_Y[0]) | (Y > bounds_Y[1]) |
-            (Z < bounds_Z[0]) | (Z > bounds_Z[1])
+            (X < bounds_X[0])
+            | (X > bounds_X[1])
+            | (Y < bounds_Y[0])
+            | (Y > bounds_Y[1])
+            | (Z < bounds_Z[0])
+            | (Z > bounds_Z[1])
         )
         return jnp.any(out).astype(float)
 
     ev = Event(cond_fn=cond_fn)
-
 
     # ---------- single-direction solve ----------
     def _solve(sign):
@@ -457,22 +482,22 @@ def field_line_trace_xyz(
         sol = diffeqsolve(
             term,
             solver,
-            t0=t0, t1=t1,
+            t0=t0,
+            t1=t1,
             y0=y_init,
             dt0=dt0,
             stepsize_controller=stepsize,
             saveat=save_steps,
             max_steps=max_steps,
-            event=ev,   # IMPORTANT for diffrax 0.7.0
+            event=ev,  # IMPORTANT for diffrax 0.7.0
         )
 
-        ts = sol.ts                     # (nsteps,)
-        ys = sol.ys                     # (nsteps, 3, N)
+        ts = sol.ts  # (nsteps,)
+        ys = sol.ys  # (nsteps, 3, N)
 
         # reshape back to (nsteps, *S, 3)
         path = jnp.moveaxis(ys, 1, -1).reshape(len(ts), *S, 3)
         return ts, path
-
 
     # ---------- direction dispatch ----------
     d = direction.lower()
@@ -495,7 +520,8 @@ def field_line_trace_xyz(
     else:
         raise ValueError("direction must be 'forward', 'backward', or 'both'")
 
-## This is a simple for loop sum. We could get huge speed ups if we summed the field 
+
+## This is a simple for loop sum. We could get huge speed ups if we summed the field
 def magnetic_field_from_coils(coils, points):
     """
     Evaluate total magnetic field from one coil or a list/tuple of coils.
@@ -518,15 +544,17 @@ def magnetic_field_from_coils(coils, points):
 
     return B_total
 
+
 # main
 import sys
+
 fin = sys.argv[1]
-df = pd.read_csv(fin).dropna(how='all')
+df = pd.read_csv(fin).dropna(how="all")
 
 df.columns = df.columns.str.strip()  # fix headers
-coils = [Coil(**row) for row in df.to_dict('records')]
+coils = [Coil(**row) for row in df.to_dict("records")]
 
-axis_xy = df[['Xc', 'Yc']].to_numpy()
+axis_xy = df[["Xc", "Yc"]].to_numpy()
 axis_path = interpolate_axis(axis_xy, AXIS_SAMPLES_PER_SEGMENT)
 axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
 B_total = np.zeros((len(axis_points), 3))
@@ -541,18 +569,19 @@ axis_x_mid = 0.5 * (axis_x.min() + axis_x.max())
 axis_y_mid = 0.5 * (axis_y.min() + axis_y.max())
 
 
-## run field line trace 
+## run field line trace
 ts, path = field_line_trace_xyz(
-    x0, y0, z0,
-    field=coils,          
-    s_total= 5,            # arc-length to trace (meters)
-    direction="both",       # "forward", "backward", or "both"
-    bounds_X=(-1e9, 1e9),   
+    x0,
+    y0,
+    z0,
+    field=coils,
+    s_total=5,  # arc-length to trace (meters)
+    direction="both",  # "forward", "backward", or "both"
+    bounds_X=(-1e9, 1e9),
     bounds_Y=(-1e9, 1e9),
     bounds_Z=(-1e9, 1e9),
 )
 # most of the path is 'inf', this is because of the diffrax adaptive solver
-
 
 
 Grid_Plot = False
@@ -561,25 +590,26 @@ if Grid_Plot:
 
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
-    
+
     fig = plt.figure(figsize=(16, 8), constrained_layout=True)
-    
+
     # 2 rows × 3 cols:
     # col0 = contour
     # col1 = colorbar (skinny)
     # col2 = right panels
     gs = GridSpec(
-        2, 3,
+        2,
+        3,
         figure=fig,
-        width_ratios=[1.5, 0.05, 1.0],   
+        width_ratios=[1.5, 0.05, 1.0],
         height_ratios=[1.0, 1.0],
     )
-    
-    ax_contour = fig.add_subplot(gs[:, 0])   # left spans both rows
-    cax        = fig.add_subplot(gs[:, 1])   # colorbar spans both rows
-    ax_axis    = fig.add_subplot(gs[0, 2])   # top-right
-    ax_blank   = fig.add_subplot(gs[1, 2])   # bottom-right
-    
+
+    ax_contour = fig.add_subplot(gs[:, 0])  # left spans both rows
+    cax = fig.add_subplot(gs[:, 1])  # colorbar spans both rows
+    ax_axis = fig.add_subplot(gs[0, 2])  # top-right
+    ax_blank = fig.add_subplot(gs[1, 2])  # bottom-right
+
     # -------------------------
     # Left: planar |B| contour
     # -------------------------
@@ -589,17 +619,17 @@ if Grid_Plot:
     contour = ax_contour.contourf(xs, ys, Bplane, levels=32, cmap="jet", alpha=0.7)
     cbar = fig.colorbar(contour, cax=cax)
     cbar.set_label("|B| in plane (T)")
-    
-    coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'OM':'green'}
+
+    coil_colors = {"BROWN": "brown", "L2": "gold", "BLUE": "blue", "OM": "green"}
     for c in coils:
         c.draw(
             ax_contour,
-            color=coil_colors.get(c.type, 'black'),
+            color=coil_colors.get(c.type, "black"),
             linewidth=2.0,
             label=f"{c.type} Coil: {c.current:>1,.0f} A",
-            add_to_legend=True
+            add_to_legend=True,
         )
-    
+
     ax_contour.plot(axis_path[:, 0], axis_path[:, 1], "w-", lw=2, label="Magnetic axis")
     ax_contour.set_xlim(-2, 2)
     ax_contour.set_ylim(-2, 2)
@@ -609,15 +639,16 @@ if Grid_Plot:
     ax_contour.set_ylabel("Y (m)")
     ax_contour.grid(True)
     ax_contour.legend(loc="upper right")
-    
-    
+
     # -------------------------
     # Top-right: |B| along axis (total)
     # -------------------------
     ax_axis.plot(s_coord, B_mag, lw=2)
     ax_axis.set_xlabel("Axis distance s (m)")
     ax_axis.set_ylabel("|B| (T)")
-    ax_axis.set_title("|B| along magnetic axis: Rm = {:.2f}".format(B_mag.max()/B_mag.min()))
+    ax_axis.set_title(
+        "|B| along magnetic axis: Rm = {:.2f}".format(B_mag.max() / B_mag.min())
+    )
     ax_axis.set_ylim(0, 0.35)
     ax_axis.grid(True)
 
@@ -629,7 +660,7 @@ if Grid_Plot:
     ax_blank.set_ylabel("|B| (T)")
     ax_blank.grid(True)
 
-    coil_colors = {'BROWN':'brown', 'L2':'gold', 'BLUE':'blue', 'OM':'green'}
+    coil_colors = {"BROWN": "brown", "L2": "gold", "BLUE": "blue", "OM": "green"}
 
     # group coils by type
     coils_by_type = {}
@@ -648,8 +679,8 @@ if Grid_Plot:
             s_coord,
             B_type_mag,
             lw=2,
-            color=coil_colors.get(ctype, 'black'),
-            label=ctype
+            color=coil_colors.get(ctype, "black"),
+            label=ctype,
         )
 
     ax_blank.legend()
@@ -664,98 +695,107 @@ else:
     y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
     xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
     fig1, ax1 = plt.subplots(figsize=(9, 9))
-    contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
-    plt.colorbar(contour, ax=ax1, label='|B| in plane (T)')
+    contour = ax1.contourf(xs, ys, Bplane, levels=32, cmap="jet", alpha=0.7)
+    plt.colorbar(contour, ax=ax1, label="|B| in plane (T)")
     for c in coils:
-        c.draw(ax1, color='black', linewidth=1.0)
-    ax1.plot(axis_path[:, 0], axis_path[:, 1], 'w-', lw=2, label='Magnetic axis')
-    ax1.legend(loc='upper right')
+        c.draw(ax1, color="black", linewidth=1.0)
+    ax1.plot(axis_path[:, 0], axis_path[:, 1], "w-", lw=2, label="Magnetic axis")
+    ax1.legend(loc="upper right")
     ax1.set_xlim(-2, 2)
     ax1.set_ylim(-2, 2)
-    ax1.set_aspect('equal', adjustable='box')
-    ax1.set_title('Planar |B| with coil outlines')
-    ax1.set_xlabel('X (m)')
-    ax1.set_ylabel('Y (m)')
+    ax1.set_aspect("equal", adjustable="box")
+    ax1.set_title("Planar |B| with coil outlines")
+    ax1.set_xlabel("X (m)")
+    ax1.set_ylabel("Y (m)")
     ax1.grid(True)
-    
+
     # Figure 2: |B| along axis (wider aspect)
     fig2, ax2 = plt.subplots(figsize=(12, 4.5))
     ax2.plot(s_coord, B_mag, lw=2)
-    ax2.set_xlabel('Axis distance s (m)')
-    ax2.set_ylabel('|B| (T)')
-    ax2.set_title('|B| along magnetic axis')
+    ax2.set_xlabel("Axis distance s (m)")
+    ax2.set_ylabel("|B| (T)")
+    ax2.set_title("|B| along magnetic axis")
     ax2.grid(True)
-    
+
     # Figure 3: Streamplot over full domain with higher density
     xs_stream, ys_stream, BX_stream, BY_stream, _ = planar_field_grid(
         coils, x_range, y_range, nx=GRID_RES_X * 3, ny=GRID_RES_Y * 3
     )
     speed_stream = np.hypot(BX_stream, BY_stream)
-    
+
     ## Now needs conversion to numpy: streamplots do not work with JAX
     xs_stream = np.asarray(xs_stream)
     ys_stream = np.asarray(ys_stream)
     BX_stream = np.asarray(BX_stream)
     BY_stream = np.asarray(BY_stream)
     speed_stream = np.asarray(speed_stream)
-    
+
     fig3, ax3 = plt.subplots(figsize=(10, 10))
     stream = ax3.streamplot(
-        xs_stream, ys_stream, BX_stream, BY_stream, color=speed_stream, cmap='jet', density=2.0
+        xs_stream,
+        ys_stream,
+        BX_stream,
+        BY_stream,
+        color=speed_stream,
+        cmap="jet",
+        density=2.0,
     )
-    fig3.colorbar(stream.lines, ax=ax3, label='|B| in plane (T)')
+    fig3.colorbar(stream.lines, ax=ax3, label="|B| in plane (T)")
     ax3.set_xlim(*x_range)
     ax3.set_ylim(*y_range)
-    ax3.set_aspect('equal', adjustable='box')
-    ax3.set_title('In-plane B field lines (full domain)')
-    ax3.set_xlabel('X (m)')
-    ax3.set_ylabel('Y (m)')
+    ax3.set_aspect("equal", adjustable="box")
+    ax3.set_title("In-plane B field lines (full domain)")
+    ax3.set_xlabel("X (m)")
+    ax3.set_ylabel("Y (m)")
     ax3.grid(True)
-    
-    
-    # Figure 4: Field line Trace 
-    
+
+    # Figure 4: Field line Trace
+
     fig4, ax4 = plt.subplots(figsize=(9, 9))
-    
+
     # plot first two and last two field lines only from x = -1 to x = 1
     for i in range(N):
         x = path[:, i, 0]
         y = path[:, i, 1]
-    
-        if i in (0, 1, N-1, N-2):
+
+        if i in (0, 1, N - 1, N - 2):
             # bottom
-            mask_bottom = (jnp.abs(x) < .75) & (y < 0)
-            ax4.plot(jnp.where(mask_bottom, x, jnp.nan),
-                     jnp.where(mask_bottom, y, jnp.nan),
-                     color="darkgray")
-    
+            mask_bottom = (jnp.abs(x) < 0.75) & (y < 0)
+            ax4.plot(
+                jnp.where(mask_bottom, x, jnp.nan),
+                jnp.where(mask_bottom, y, jnp.nan),
+                color="darkgray",
+            )
+
             # top
             mask_top = (jnp.abs(x) < 1) & (y > 0)
-            ax4.plot(jnp.where(mask_top, x, jnp.nan),
-                     jnp.where(mask_top, y, jnp.nan),
-                     color="darkgray")
-    
+            ax4.plot(
+                jnp.where(mask_top, x, jnp.nan),
+                jnp.where(mask_top, y, jnp.nan),
+                color="darkgray",
+            )
+
         else:
             ax4.plot(x, y, color="darkgray")
-    # for legend 
-    ax4.plot(x[0], y[0], color="darkgray",alpha = 1, label = "Fieldlines")
-    
+    # for legend
+    ax4.plot(x[0], y[0], color="darkgray", alpha=1, label="Fieldlines")
+
     x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)
     y_range = (axis_y_mid - PLANE_HALF_WIDTH, axis_y_mid + PLANE_HALF_WIDTH)
     xs, ys, BX_full, BY_full, Bplane = planar_field_grid(coils, x_range, y_range)
-    contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap='jet', alpha=0.7)
-    plt.colorbar(contour, ax=ax4, label='|B| in plane (T)')
-    
+    contour = ax4.contourf(xs, ys, Bplane, levels=32, cmap="jet", alpha=0.7)
+    plt.colorbar(contour, ax=ax4, label="|B| in plane (T)")
+
     for c in coils:
-        c.draw(ax4, color='black', linewidth=1.0)
-     
-    ax4.legend(loc='upper right')
+        c.draw(ax4, color="black", linewidth=1.0)
+
+    ax4.legend(loc="upper right")
     ax4.set_xlim(-2, 2)
     ax4.set_ylim(-2, 2)
-    ax4.set_aspect('equal', adjustable='box')
-    ax4.set_title('Field Line Trace with coil outlines')
-    ax4.set_xlabel('X (m)')
-    ax4.set_ylabel('Y (m)')
+    ax4.set_aspect("equal", adjustable="box")
+    ax4.set_title("Field Line Trace with coil outlines")
+    ax4.set_xlabel("X (m)")
+    ax4.set_ylabel("Y (m)")
     ax4.grid(True)
-    
+
     plt.show()
