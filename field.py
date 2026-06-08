@@ -276,7 +276,7 @@ class Coil:
         return V_coil
 
 
-def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
+def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT, loop = True):
     """Linearly interpolate between COM points to approximate the magnetic axis."""
     points = np.asarray(points, dtype=float)
     if len(points) < 2:
@@ -286,7 +286,8 @@ def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
         ts = np.linspace(0.0, 1.0, samples_per_segment, endpoint=False)
         for t in ts:
             segments.append(start + t * (end - start))
-    segments.append(points[-1])
+    if loop:
+        segments.append(points[-1])
     return np.vstack(segments)
 
 

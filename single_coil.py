@@ -34,3 +34,4 @@ print(f"  Power: {power:.4f} W")
 
 temp_change = power / coil_mass / 385
 print(f"  Temperature Change: {temp_change:.9f} C/s\n")
+

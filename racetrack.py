@@ -28,6 +28,7 @@ class Racetrack:
         self.coils = None
         self.straight_displacements = straight_displacements or {typ: 0 for typ in straight_types}
         self.center_displacements = center_displacements or {typ: 0 for typ in center_types}
+        self.center_gaps = {typ: 0 for typ in center_types}
         self.mirror_shift = 0
 
         for typ in straight_types:
@@ -170,6 +171,16 @@ class Racetrack:
                     coil.Xc = (X - self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) + self.Mirror_Length/2
                     coil.Yc = (X - self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
                     coil.angle -= self.center_displacements[coil.type]
+
+        #shift coils in curved sections towards one another if needed
+        for i in range(len(self.coils) - 1):
+            coil = self.coils[i]
+            if coil['type'] in self.center_types:
+                X = coil['Xc']
+                Y = coil['Yc']
+                gap = self.center_gaps[coil['type']]
+                if coil['Xc'] > 0 and coil['Yc'] > 0:
+                    break
 
 
     def write_csv(self):

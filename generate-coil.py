@@ -4,9 +4,9 @@ import field
 from field import Coil, interpolate_axis, AXIS_SAMPLES_PER_SEGMENT, CU_DENSITY
 
 """This script generates a CSV of possible coil geometries and their properties (G/A, length, mass, etc.) for a single coil design. It iterates over a range of outer diameters (OD), inner diameters (ID), and axial lengths (DZ) to compute the resulting magnetic field strength per ampere (G/A) at the center of the coil, as well as other relevant properties. The results are saved to 'possible-coil.csv' and visualized with plots."""
-
+field.COIL_MODEL_FILE = 'coil_models/coil_model-tests.csv'
 results = []
-for OD in [0.4, 0.5]:
+for OD in [0.4, 0.45, 0.5]:
     for ID in np.arange(0.31, OD - 0.01, 0.01):
         for DZ in np.arange(0.01, 0.1, 0.01):
 
@@ -80,7 +80,7 @@ print(f"Saved {len(results)} results to possible-coil.csv")
 
 
 import matplotlib.pyplot as plt
-for OD in [0.4, 0.5]:
+for OD in [0.4, 0.45, 0.5]:
     subset = results_df[results_df['OD'] == OD]
     pivot = subset.pivot(index='ID', columns='DZ', values='G_per_A')
     pivot_length = subset.pivot(index='ID', columns='DZ', values='Length_m')
@@ -100,10 +100,10 @@ for OD in [0.4, 0.5]:
     plt.show()
 
     fig, ax = plt.subplots()
-    ax.scatter(subset['Length_m'], subset['G_per_A'], c=subset['Mass_kg'], cmap='viridis', s=100, edgecolors='k')
+    ax.scatter(subset['Length_m'], subset['G_per_A'], c=subset['ID'], cmap='viridis', s=100, edgecolors='k')
     ax.set_xlabel('Coil Length (m)')
     ax.set_ylabel('G/A')
     ax.set_title('G/A vs Coil Length')
-    plt.colorbar(ax.collections[0], ax=ax, label='Mass (kg)')
+    plt.colorbar(ax.collections[0], ax=ax, label='Inner Diameter (m)')
     plt.tight_layout()
     plt.show()
