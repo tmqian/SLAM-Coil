@@ -56,7 +56,7 @@ class Racetrack:
                 self.center_displacements[typ] = 0
 
     def build_coils(self):
-        self.coils = []
+        self.coils: List[Coil] = []
 
         def add(x, y, angle_rad, ctype):
             self.coils.append(Coil(x, y, math.degrees(angle_rad), ctype))

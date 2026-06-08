@@ -4,6 +4,7 @@
 
 from pathlib import Path
 import math
+from typing import List
 
 import matplotlib
 
@@ -523,7 +524,7 @@ def contour_plot(
 
 def axis_field_plot(
     ax,
-    coils,
+    coils: List[Coil],
     axis_path,
     show_labels=True,
     length_units="m",
