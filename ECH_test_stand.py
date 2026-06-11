@@ -106,4 +106,33 @@ ax.set_ylabel("|B| (G)")
 ax.set_title("ECH Test Stand: |B| along axis")
 ax.grid()
 ax.legend(loc="lower right", framealpha=0.95)
+
+# Add informational box for vessel and magnet positions
+vessel_left = VESSEL_CENTER_X - VESSEL_WIDTH / 2
+vessel_right = VESSEL_CENTER_X + VESSEL_WIDTH / 2
+info_lines = [
+    "Geometry",
+    f"Vessel: {vessel_left:.4f} to {vessel_right:.4f} m",
+]
+for i, coil in enumerate(coils):
+    coil_left = coil.Xc - COIL_WIDTH / 2
+    coil_right = coil.Xc + COIL_WIDTH / 2
+    info_lines.append(f"Coil {i+1}: {coil_left:.4f} to {coil_right:.4f} m")
+
+info_text = "\n".join(info_lines)
+info_props = dict(
+    boxstyle="round,pad=0.4", facecolor="lightblue", edgecolor="black", alpha=0.85
+)
+ax.text(
+    0.02,
+    0.97,
+    info_text,
+    transform=ax.transAxes,
+    fontsize=8,
+    verticalalignment="top",
+    horizontalalignment="left",
+    bbox=info_props,
+    family="monospace",
+)
+
 fig.savefig("generated/plots/ECH_test_stand_axis.png", dpi=300)
