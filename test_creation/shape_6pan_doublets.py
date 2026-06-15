@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 import numpy as np
 
+
 def midpoints(start, stop, count):
     step = (stop - start) / count
     return [start + (i + 0.5) * step for i in range(count)]
@@ -15,47 +16,57 @@ import math
 import numpy as np
 
 
-
-'''
+"""
 
 Inputs 
 
 
-'''
+"""
 
-#large
-#straight_types = ["Brown", "OM","OM","OM", "Brown"]
-#center_types = ["Blue", "L2block","Blue", "L2block", "Blue", "L2block", "Blue","L2block","Blue"]
+# large
+# straight_types = ["Brown", "OM","OM","OM", "Brown"]
+# center_types = ["Blue", "L2block","Blue", "L2block", "Blue", "L2block", "Blue","L2block","Blue"]
 
-#Mirror_Length = 2
-#Stellerator_Radius = 1.2
+# Mirror_Length = 2
+# Stellerator_Radius = 1.2
 
-# small 
-#straight_types = ["L2", "L2","L2", "L2","L2", "L2"]
-#center_types = ["Blue","Blue", "Blue","Blue","Blue"]
+# small
+# straight_types = ["L2", "L2","L2", "L2","L2", "L2"]
+# center_types = ["Blue","Blue", "Blue","Blue","Blue"]
 
-#Mirror_Length = 1
-#Stellerator_Radius = .9
-#filename = "small_test_L2_mirror.csv"
+# Mirror_Length = 1
+# Stellerator_Radius = .9
+# filename = "small_test_L2_mirror.csv"
 
-#high field low current 
-straight_types = ["Brown", "OM","OM","OM", "Brown"]
-center_types = ["Blue", "6pan", "6pan", "BlueCenter", "6panCenter", "6panCenter", "BlueCenter", "6pan", "6pan", "Blue"]
+# high field low current
+straight_types = ["Brown", "OM", "OM", "OM", "Brown"]
+center_types = [
+    "Blue",
+    "6pan",
+    "6pan",
+    "BlueCenter",
+    "6panCenter",
+    "6panCenter",
+    "BlueCenter",
+    "6pan",
+    "6pan",
+    "Blue",
+]
 
 Mirror_Length = 1.5
 Stellerator_Radius = 0.43
 extra_R_6pan = 0
 extra_R_blue = 0
-#filename = "medium_Lm_1p5.csv"
+# filename = "medium_Lm_1p5.csv"
 filename = "../test_files/racetrack_6pan_R0-43_movedOM.csv"
 
-#L2 Stell 
-#straight_types = ["Blue","Blue", "OM","OM","OM", "Blue","Blue"]
-#center_types = ["L2block","L2block", "L2block","L2block","L2block","L2block"]
+# L2 Stell
+# straight_types = ["Blue","Blue", "OM","OM","OM", "Blue","Blue"]
+# center_types = ["L2block","L2block", "L2block","L2block","L2block","L2block"]
 
-#Mirror_Length = 1.5
-#Stellerator_Radius = .5
-#filename = "L2Stell_Lm_1.csv"
+# Mirror_Length = 1.5
+# Stellerator_Radius = .5
+# filename = "L2Stell_Lm_1.csv"
 
 
 def midpoints(start, stop, count):
@@ -65,124 +76,138 @@ def midpoints(start, stop, count):
 
 def build_coils(L=Mirror_Length, R=Stellerator_Radius):
     """
-    Hardcoded: Racetrack coil layout with L2 TRIPLETS 
-    
+    Hardcoded: Racetrack coil layout with L2 TRIPLETS
+
     """
     coils = []
 
     def add(x, y, angle_rad, ctype):
-        coils.append({
-            "Xc": x,
-            "Yc": y,
-            "angle": math.degrees(angle_rad),
-            "type": ctype,
-        })
+        coils.append(
+            {
+                "Xc": x,
+                "Yc": y,
+                "angle": math.degrees(angle_rad),
+                "type": ctype,
+            }
+        )
 
     # ---------------------------------------------------------
     # L2 coil geometry for angular offsets
     # ---------------------------------------------------------
-    DZ_L2 = 0.03       # tangential thickness per layer (m)
-    Nz_L2 = 2          # number of layers
+    DZ_L2 = 0.03  # tangential thickness per layer (m)
+    Nz_L2 = 2  # number of layers
     W = DZ_L2 * Nz_L2  # total tangential width (m) = 0.06 m
 
-    dtheta = W / R     # angular width of coil
-    delta = dtheta / 2 # half-width in angle
+    dtheta = W / R  # angular width of coil
+    delta = dtheta / 2  # half-width in angle
 
     # ---------------------------------------------------------
     # Straight sections: coils evenly spaced
     # ---------------------------------------------------------
-    num_straight = len(straight_types)   
-    mx = midpoints(-L/2, L/2, num_straight)
+    num_straight = len(straight_types)
+    mx = midpoints(-L / 2, L / 2, num_straight)
 
     # 1. TOP STRAIGHT: left → right
     for x, ctype in zip(mx, straight_types):
-        add(x, +R+0.03, +math.pi/2, ctype)
+        add(x, +R + 0.03, +math.pi / 2, ctype)
 
     # ---------------------------------------------------------
     # CURVED SECTIONS:
     # ---------------------------------------------------------
-    
-    num_curve = len(center_types)   
 
-    t_start = -math.pi/2 + math.pi/(num_curve*2)
-    t_stop  = +math.pi/2 - math.pi/(num_curve*2)
-    
+    num_curve = len(center_types)
+
+    t_start = -math.pi / 2 + math.pi / (num_curve * 2)
+    t_stop = +math.pi / 2 - math.pi / (num_curve * 2)
+
     centers = np.linspace(t_start, t_stop, num_curve)
 
     # ---------------------------------------------------------
     # 2. RIGHT ARC:
     # ---------------------------------------------------------
-    cx = +L/2
+    cx = +L / 2
 
     for t_center, typ in zip(centers[::-1], center_types[::-1]):
-
-        if typ == '6pan':
-            add(cx + (R+extra_R_6pan)*math.cos(t_center),
-                    (R+extra_R_6pan)*math.sin(t_center),
-                    t_center,
-                    f"{typ}")
-        elif typ == '6panCenter':
-            add(cx + (R+extra_R_6pan)*math.cos(t_center),
-                    (R+extra_R_6pan)*math.sin(t_center),
-                    t_center,
-                    f"{typ}")
-        elif typ == 'Blue':
-            add(cx + (R+extra_R_blue)*math.cos(t_center),
-                    (R+extra_R_blue)*math.sin(t_center),
-                    t_center,
-                    f"{typ}")
-        elif typ == 'BlueCenter':
-            add(cx + (R+extra_R_blue)*math.cos(t_center),
-                    (R+extra_R_blue)*math.sin(t_center),
-                    t_center,
-                    f"{typ}")
+        if typ == "6pan":
+            add(
+                cx + (R + extra_R_6pan) * math.cos(t_center),
+                (R + extra_R_6pan) * math.sin(t_center),
+                t_center,
+                f"{typ}",
+            )
+        elif typ == "6panCenter":
+            add(
+                cx + (R + extra_R_6pan) * math.cos(t_center),
+                (R + extra_R_6pan) * math.sin(t_center),
+                t_center,
+                f"{typ}",
+            )
+        elif typ == "Blue":
+            add(
+                cx + (R + extra_R_blue) * math.cos(t_center),
+                (R + extra_R_blue) * math.sin(t_center),
+                t_center,
+                f"{typ}",
+            )
+        elif typ == "BlueCenter":
+            add(
+                cx + (R + extra_R_blue) * math.cos(t_center),
+                (R + extra_R_blue) * math.sin(t_center),
+                t_center,
+                f"{typ}",
+            )
         else:
-            add(cx + R*math.cos(t_center),
-                    R*math.sin(t_center),
-                    t_center,
-                    f"{typ}")
+            add(cx + R * math.cos(t_center), R * math.sin(t_center), t_center, f"{typ}")
 
     # ---------------------------------------------------------
     # 3. BOTTOM STRAIGHT
     # ---------------------------------------------------------
     for x, ctype in zip(mx[::-1], straight_types):
-        add(x, -R-0.03, -math.pi/2, ctype)
+        add(x, -R - 0.03, -math.pi / 2, ctype)
 
     # ---------------------------------------------------------
     # 4. LEFT ARC
     # ---------------------------------------------------------
-    cx = -L/2
+    cx = -L / 2
 
     for t_center, typ in zip(centers, center_types):
-
-        if typ == '6pan':
-            add(cx - (R+extra_R_6pan)*math.cos(t_center),
-                    (R+extra_R_6pan)*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ}")
-        elif typ == '6panCenter':
-            add(cx - (R+extra_R_6pan)*math.cos(t_center),
-                    (R+extra_R_6pan)*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ}")
-        elif typ == 'Blue':
-            add(cx - (R+extra_R_blue)*math.cos(t_center),
-                    (R+extra_R_blue)*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ}")
-        elif typ == 'BlueCenter':
-            add(cx - (R+extra_R_blue)*math.cos(t_center),
-                    (R+extra_R_blue)*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ}")
+        if typ == "6pan":
+            add(
+                cx - (R + extra_R_6pan) * math.cos(t_center),
+                (R + extra_R_6pan) * math.sin(t_center),
+                math.pi - t_center,
+                f"{typ}",
+            )
+        elif typ == "6panCenter":
+            add(
+                cx - (R + extra_R_6pan) * math.cos(t_center),
+                (R + extra_R_6pan) * math.sin(t_center),
+                math.pi - t_center,
+                f"{typ}",
+            )
+        elif typ == "Blue":
+            add(
+                cx - (R + extra_R_blue) * math.cos(t_center),
+                (R + extra_R_blue) * math.sin(t_center),
+                math.pi - t_center,
+                f"{typ}",
+            )
+        elif typ == "BlueCenter":
+            add(
+                cx - (R + extra_R_blue) * math.cos(t_center),
+                (R + extra_R_blue) * math.sin(t_center),
+                math.pi - t_center,
+                f"{typ}",
+            )
         else:
-            add(cx - R*math.cos(t_center),
-                    R*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ}")
+            add(
+                cx - R * math.cos(t_center),
+                R * math.sin(t_center),
+                math.pi - t_center,
+                f"{typ}",
+            )
 
     return coils
-
 
 
 def write_csv(coils, path):

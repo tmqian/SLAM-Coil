@@ -23,7 +23,7 @@ coil_length = coil.get_length(False)
 print(f"  Length: {coil_length:.2f} m")
 
 resistance = coil_length * 0.00033
-print(f"  Resistance: {resistance*1000:.2f} mOhms")
+print(f"  Resistance: {resistance * 1000:.2f} mOhms")
 
 # Assume pure copper
 coil_volume = coil_length * (0.008**2 - np.pi * 0.002**2)

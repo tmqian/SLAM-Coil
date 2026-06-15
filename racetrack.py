@@ -89,7 +89,6 @@ class Racetrack:
         cx = self.Mirror_Length / 2
 
         for t_center, typ in zip(centers[::-1], self.center_types[::-1]):
-
             if typ == "6pan":
                 add(
                     cx
@@ -145,7 +144,6 @@ class Racetrack:
         # ---------------------------------------------------------
 
         for t_center, typ in zip(centers, self.center_types):
-
             if typ == "6pan":
                 add(
                     -cx

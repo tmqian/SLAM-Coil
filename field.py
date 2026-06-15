@@ -63,7 +63,6 @@ def get_coil_models():
 
 
 class Coil:
-
     def __init__(self, Xc=1, Yc=1, angle=90, type=None):
         """
         (Xc,Yc) is the COM of the coil

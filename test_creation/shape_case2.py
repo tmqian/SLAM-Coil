@@ -23,12 +23,16 @@ def build_coils(L=2.0, D=1.0, Ns=10):
     ts_old = midpoints(-math.pi / 2, math.pi / 2, Ns)
 
     # new 9 angles between preserved endpoints
-    ts_new = [ts_old[0]] + [
-        ts_old[0] + i*(ts_old[-1]-ts_old[0])/(Ns_alt-1)
-        for i in range(1, Ns_alt-1)
-    ] + [ts_old[-1]]
+    ts_new = (
+        [ts_old[0]]
+        + [
+            ts_old[0] + i * (ts_old[-1] - ts_old[0]) / (Ns_alt - 1)
+            for i in range(1, Ns_alt - 1)
+        ]
+        + [ts_old[-1]]
+    )
 
-    arc_types = ["Blue","L2","Blue","L2","Blue","L2","Blue","L2","Blue"]
+    arc_types = ["Blue", "L2", "Blue", "L2", "Blue", "L2", "Blue", "L2", "Blue"]
 
     coils = []
 
@@ -37,30 +41,31 @@ def build_coils(L=2.0, D=1.0, Ns=10):
 
     # ───── TOP STRAIGHT: left → right ─────
     for x, ctype in zip(mx, straight_types):
-        add(x, D/2, 90.0, ctype)
+        add(x, D / 2, 90.0, ctype)
 
     # ───── RIGHT ARC: bottom → top ─────
     for t, ctype in zip(ts_new, arc_types):
-        add(L/2 + (D/2)*math.cos(t),
-            (D/2)*math.sin(t),
-            math.degrees(t),
-            ctype)
+        add(
+            L / 2 + (D / 2) * math.cos(t), (D / 2) * math.sin(t), math.degrees(t), ctype
+        )
 
     # ───── BOTTOM STRAIGHT: right → left ─────
     for x, ctype in zip(reversed(mx), straight_types):
-        add(x, -D/2, -90.0, ctype)
+        add(x, -D / 2, -90.0, ctype)
 
     # ───── LEFT ARC: top → bottom ─────
     for t, ctype in zip(reversed(ts_new), arc_types):
-        add(-L/2 - (D/2)*math.cos(t),
-            (D/2)*math.sin(t),
+        add(
+            -L / 2 - (D / 2) * math.cos(t),
+            (D / 2) * math.sin(t),
             180.0 - math.degrees(t),
-            ctype)
+            ctype,
+        )
 
     # order coils by polar angle
     for coil in coils:
         phi = math.atan2(coil["Yc"], coil["Xc"])
-        coil["phi"] = (phi + 2*math.pi) % (2*math.pi)
+        coil["phi"] = (phi + 2 * math.pi) % (2 * math.pi)
     coils.sort(key=lambda c: c["phi"])
     for coil in coils:
         coil.pop("phi", None)

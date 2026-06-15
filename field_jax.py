@@ -128,7 +128,6 @@ def loop_field(radius, rho, z, current):
 
 @jax.tree_util.register_pytree_node_class
 class Coil:
-
     def __init__(self, Xc, Yc, angle, type):
         models = get_coil_models()
         if type.upper() not in models:
@@ -587,7 +586,6 @@ ts, path = field_line_trace_xyz(
 Grid_Plot = False
 
 if Grid_Plot:
-
     import matplotlib.pyplot as plt
     from matplotlib.gridspec import GridSpec
 
@@ -688,7 +686,6 @@ if Grid_Plot:
     plt.show()
 
 else:
-
     ### PLOTTING###
     # Figure 1: contour plot with coil outlines (full domain)
     x_range = (axis_x_mid - PLANE_HALF_WIDTH, axis_x_mid + PLANE_HALF_WIDTH)

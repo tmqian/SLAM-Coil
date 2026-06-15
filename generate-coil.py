@@ -14,7 +14,6 @@ results = []
 for OD in [0.4, 0.5]:
     for ID in np.arange(0.31, OD - 0.01, 0.01):
         for DZ in np.arange(0.01, 0.1, 0.01):
-
             coil_models = pd.read_csv("coil_models/coil_model-tests.csv")
 
             nr = round((OD - ID) / 0.02, 10)

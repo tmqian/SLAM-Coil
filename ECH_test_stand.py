@@ -4,7 +4,7 @@ import numpy as np
 
 from field import get_coil_info
 
-CURRENT = 275  # Amps
+CURRENT = 250  # Amps
 THRESHOLD = 875.0  # Gauss
 COIL_WIDTH = 0.076
 VESSEL_WIDTH = 0.205  # 20.5 cm
@@ -84,60 +84,51 @@ for i, idx in enumerate(cross_idxs):
     ax.scatter([xc], [yc], color="red", zorder=5)
     crossing_labels.append(float(xc))
 
-# Add text box with all crossings
-if crossing_labels:
-    crossing_lines = [
-        "Resonances",
-        f"({THRESHOLD:.0f} G)",
-        *[f"x = {xc:+.3f} m" for xc in crossing_labels],
-    ]
-    textstr = "\n".join(crossing_lines)
-    props = dict(
-        boxstyle="round,pad=0.4", facecolor="white", edgecolor="red", alpha=0.9
-    )
-    ax.text(
-        0.98,
-        0.97,
-        textstr,
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        horizontalalignment="right",
-        bbox=props,
-        color="red",
-    )
 ax.set_xlabel("x (m)")
 ax.set_ylabel("|B| (G)")
 ax.set_title("ECH Test Stand: |B| along axis")
 ax.grid()
 ax.legend(loc="lower right", framealpha=0.95)
 
-# Add informational box for vessel and magnet positions
+# Add consolidated informational box for geometry, current, and crossings
 vessel_left = VESSEL_CENTER_X - VESSEL_WIDTH / 2
 vessel_right = VESSEL_CENTER_X + VESSEL_WIDTH / 2
 info_lines = [
-    "Geometry",
+    r"$\mathbf{Setup}$",
+    f"Current: {CURRENT:.0f} A",
+    f"Threshold: {THRESHOLD:.0f} G",
+    "",
+    r"$\mathbf{Geometry}$",
     f"Vessel: {vessel_left:.4f} to {vessel_right:.4f} m",
 ]
 for i, coil in enumerate(coils):
     coil_left = coil.Xc - COIL_WIDTH / 2
     coil_right = coil.Xc + COIL_WIDTH / 2
-    info_lines.append(f"Coil {i + 1}: {coil_left:.4f} to {coil_right:.4f} m")
+    info_lines.append(f"Coil Set {i + 1}: {coil_left:.4f} to {coil_right:.4f} m")
+
+if crossing_labels:
+    info_lines.extend(
+        [
+            "",
+            r"$\mathbf{Resonances}$",
+            *[f"x = {xc:+.3f} m" for xc in crossing_labels],
+        ]
+    )
 
 info_text = "\n".join(info_lines)
 info_props = dict(
-    boxstyle="round,pad=0.4", facecolor="lightblue", edgecolor="black", alpha=0.85
+    boxstyle="round,pad=0.4", facecolor="white", edgecolor="black", alpha=0.92
 )
 ax.text(
-    0.02,
+    0.98,
     0.97,
     info_text,
     transform=ax.transAxes,
     fontsize=8,
     verticalalignment="top",
-    horizontalalignment="left",
+    horizontalalignment="right",
+    multialignment="left",
     bbox=info_props,
-    family="monospace",
 )
 
 fig.savefig("generated/plots/ECH_test_stand_axis.png", dpi=300)

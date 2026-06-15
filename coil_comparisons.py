@@ -39,7 +39,6 @@ ax_text.text(
 )
 
 for k in range(3):
-
     fin = sys.argv[k + 1]
     coils, axis_path = get_coil_info(fin)
     mag_axis = np.linspace(-0.5, 0.5, 51)

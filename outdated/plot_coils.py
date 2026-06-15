@@ -19,18 +19,32 @@ def _unit_radial(angle_deg: float) -> np.ndarray:
     return vec / np.linalg.norm(vec)
 
 
-def _rectangle_vertices(center: np.ndarray, u_r: np.ndarray, radial_width: float, axial_width: float) -> list[np.ndarray]:
+def _rectangle_vertices(
+    center: np.ndarray, u_r: np.ndarray, radial_width: float, axial_width: float
+) -> list[np.ndarray]:
     """Return the four 3D vertices of the radial-axial rectangle."""
     half_r = radial_width / 2.0
     half_z = axial_width / 2.0
     e_z = np.array([0.0, 0.0, 1.0], dtype=float)
     corners = []
-    for dr, dz in [(-half_r, -half_z), (half_r, -half_z), (half_r, half_z), (-half_r, half_z)]:
+    for dr, dz in [
+        (-half_r, -half_z),
+        (half_r, -half_z),
+        (half_r, half_z),
+        (-half_r, half_z),
+    ]:
         corners.append(center + dr * u_r + dz * e_z)
     return corners
 
 
-def _filament_points(center: np.ndarray, u_r: np.ndarray, radial_width: float, axial_width: float, nr: int, nz: int) -> np.ndarray:
+def _filament_points(
+    center: np.ndarray,
+    u_r: np.ndarray,
+    radial_width: float,
+    axial_width: float,
+    nr: int,
+    nz: int,
+) -> np.ndarray:
     """Return NR x NZ filament coordinates across the radial/axial grid."""
     half_r = radial_width / 2.0
     half_z = axial_width / 2.0
@@ -62,7 +76,9 @@ def plot_coils(ax, coils: pd.DataFrame) -> None:
 
         color = colors[idx % len(colors)]
         vertices = _rectangle_vertices(center, u_r, radial_width, axial_width)
-        poly = Poly3DCollection([vertices], facecolor=color, alpha=0.35, edgecolor=color, linewidths=1.2)
+        poly = Poly3DCollection(
+            [vertices], facecolor=color, alpha=0.35, edgecolor=color, linewidths=1.2
+        )
         ax.add_collection3d(poly)
 
         filaments = _filament_points(center, u_r, radial_width, axial_width, nr, nz)
@@ -81,7 +97,9 @@ def _set_equal_scale(ax) -> None:
     centers = np.mean(ranges, axis=1)
     max_span = max(spans)
 
-    for center, setter in zip(centers, [ax.set_xlim3d, ax.set_ylim3d, ax.set_zlim3d], strict=True):
+    for center, setter in zip(
+        centers, [ax.set_xlim3d, ax.set_ylim3d, ax.set_zlim3d], strict=True
+    ):
         setter(center - max_span / 2.0, center + max_span / 2.0)
 
 
@@ -93,9 +111,20 @@ def load_coils(csv_path: Path) -> pd.DataFrame:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot coil boxes and filament locations from a CSV file.")
-    parser.add_argument("csv", nargs="?", default="test-coil.csv", help="Path to the coil definition CSV.")
-    parser.add_argument("--output", "-o", help="Optional path to save the figure instead of displaying it.")
+    parser = argparse.ArgumentParser(
+        description="Plot coil boxes and filament locations from a CSV file."
+    )
+    parser.add_argument(
+        "csv",
+        nargs="?",
+        default="test-coil.csv",
+        help="Path to the coil definition CSV.",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        help="Optional path to save the figure instead of displaying it.",
+    )
     args = parser.parse_args()
 
     coils = load_coils(Path(args.csv))
