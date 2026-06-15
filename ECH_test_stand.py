@@ -1,11 +1,15 @@
 # pyright: standard
-from field import *
+import matplotlib.pyplot as plt
+import numpy as np
 
-CURRENT = 250  # Amps
+from field import get_coil_info
+
+CURRENT = 275  # Amps
 THRESHOLD = 875.0  # Gauss
 COIL_WIDTH = 0.076
 VESSEL_WIDTH = 0.205  # 20.5 cm
 VESSEL_CENTER_X = 0.0
+
 
 # Get axis path
 coils, _ = get_coil_info(
@@ -35,6 +39,7 @@ ax.axvspan(
     zorder=0,
     label="Vacuum vessel",
 )
+
 
 # Shade approximate coil-width regions on the axis plot
 for i, coil in enumerate(coils):
@@ -117,7 +122,7 @@ info_lines = [
 for i, coil in enumerate(coils):
     coil_left = coil.Xc - COIL_WIDTH / 2
     coil_right = coil.Xc + COIL_WIDTH / 2
-    info_lines.append(f"Coil {i+1}: {coil_left:.4f} to {coil_right:.4f} m")
+    info_lines.append(f"Coil {i + 1}: {coil_left:.4f} to {coil_right:.4f} m")
 
 info_text = "\n".join(info_lines)
 info_props = dict(
