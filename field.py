@@ -28,7 +28,7 @@ GRID_RES_Y = 80
 X_RANGE = (-2, 2)
 Y_RANGE = (-2, 2)
 CU_DENSITY = 8960  #kg/m^3
-COIL_MODEL_FILE = 'coil_models/coil_model.csv'
+COIL_MODEL_FILE = 'coil_models/coil_model_lars.csv'
 
 
 def get_coil_models():
@@ -59,7 +59,7 @@ def get_coil_models():
 
 class Coil:
 
-    def __init__(self, Xc=1, Yc=1, angle=90, type=None):
+    def __init__(self, Xc=1, Yc=1, angle=90, type=None, check_csv=True):
         '''
         (Xc,Yc) is the COM of the coil
         angle is of the plane of the coil in degrees, 0 is +xaxis
@@ -74,16 +74,18 @@ class Coil:
             raise ValueError("Coil type string is required (e.g. 'OM', 'L2').")
         self.type = type.strip()
 
-        models = get_coil_models()
-        if self.type not in models:
-            raise ValueError(f"Unknown coil type '{self.type}'. Add it to coil-model.csv.")
-        model = models[self.type]
+        model = {}
+        if check_csv == True:
+            models = get_coil_models()
+            if self.type not in models:
+                raise ValueError(f"Unknown coil type '{self.type}'. Add it to coil-model.csv.")
+            model = models[self.type]
 
-        self.ID = float(model['ID'])
-        self.OD = float(model['OD'])
-        self.DZ = float(model['DZ'])
-        self.Nr = int(model['Nr'])
-        self.Nz = int(model['Nz'])
+        self.ID = float(model.get('ID', 1))
+        self.OD = float(model.get('OD', 2))
+        self.DZ = float(model.get('DZ', 1))
+        self.Nr = int(model.get('Nr', 1))
+        self.Nz = int(model.get('Nz', 1))
         self.nr = max(1, int(model.get('nr', self.Nr)))
         self.nz = max(1, int(model.get('nz', self.Nz)))
         self.current = float(model.get('current', 0.0))
@@ -95,8 +97,8 @@ class Coil:
         self._basis_e3 = np.cross(self._basis_e1, self._basis_e2)
         self._basis = np.stack([self._basis_e1, self._basis_e2, self._basis_e3], axis=1)
         self._basis_T = self._basis.T
-        self.parallel =  False if int(model['parallel']) == 0 else True
-        self.parallel_partitions = int(model['partitions'])
+        self.parallel =  False if int(model.get('parallel', 0)) == 0 else True
+        self.parallel_partitions = int(model.get('partitions', 0))
 
     @staticmethod
     def _build_midpoints(start, stop, count):
