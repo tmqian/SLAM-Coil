@@ -3,15 +3,15 @@ from racetrack import *
 
 """Testing ways to make it easer to adjust coil positions"""
 
-straight_types = ["Brown", "OM","OM","OM", "Brown"]
-center_types = ["Blue", "12pan","BlueCenter", "12panCenter", "BlueCenter", "12pan", "Blue"]
+straight_types = ["Brown", "OM","OMCenter","OM", "Brown"]
+center_types = ['Blue', 'Lani1', 'Lani2', 'BlueInner', 'LaniCenter1', 'LaniCenter2', 'BlueCenter', 'LaniCenter2', 'LaniCenter1', 'BlueInner', 'Lani2', 'Lani1', 'Blue']
 
 Mirror_Length = 1.5
 Stellerator_Radius = 0.5
-#filename = "medium_Lm_1p5.csv"
-filename = "../test_files/racetrack_6pan.csv"
-sd = {'Brown': 0.00, 'OM': 0.0}
-cd = {'Blue': 0, '12pan': 0, 'BlueCenter': 0}
+filename = "test_files/racetrack_4x5_5Blue_smallerID.csv"
+sd = {'Brown': -0.15, 'OM': 0}
+disp_angle = 1.5 # positive toward blue, negative away from blue
+cd = {'Blue': 0, 'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle}
 
 rt = Racetrack(Mirror_Length, 
                          Stellerator_Radius,
@@ -20,15 +20,45 @@ rt = Racetrack(Mirror_Length,
                          straight_displacements=None,center_displacements=cd,
                          filename=filename)
 rt.build_coils()
+
+
 rt.write_csv()
+center, center_space, straight = rt.build_ports(r = 0.47, rho=0.5)
+angles = np.array([c.angle for c in rt.coils if c.type in rt.center_types]) % 360
+
+# print(f"Port angles: {angles}")
+# print(f"Port center spaces: {center_space}")
+# print(f"Port center positions: {center}")
+
+#Write ports to file
+with open('ports.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(['ports (deg)', 'space (cm)'])
+    for port, space in zip(center, center_space):
+        writer.writerow([f"{port:.6f}", f"{space:.6f}"])
+
+
+coils, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
+axis_path = np.vstack([axis_path, axis_path[0]])  # close the loop
+
+
+# blue_scoord, idx_4panS = get_coil_scoord(rt.coils, axis_path, '4panS')
+# print(f"4panS coil s-coordinates: {blue_scoord}")
+# B_ripple, scoord = get_Bmag_on_axis(rt.coils, axis_path)
+# B_ripple = B_ripple[idx_4panS[1]:idx_4panS[2]]
+# plt.plot(scoord[idx_4panS[1]:idx_4panS[2]], B_ripple, label='4panS Coil B-field', linestyle='-', color='purple')
+# ripple = (B_ripple.max() - B_ripple.min()) / B_ripple.mean()
+# print(f"Ripple for 4panS coil: {ripple:.2%}")
+# plt.xlabel('s (m)')
+# plt.ylabel('|B| (T)')
 
 plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
-    coils, axis_path = get_coil_info(filename[1:], interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
 
-
-    coil_colors = {'Brown':'brown', 'L2':'gold', 'Blue':'blue', 'BlueCenter':'red', 'OM':'green', '12pan':'black', '12panCenter':'gold', '6pan':'black', '6panCenter':'gold'}
-
+    coil_colors = {'Brown':'brown', 'L2':'gold', 'Blue':'blue',
+               'BlueCenter':'red', 'BlueInner': 'violet', 'OM':'green', 'LaniCenter':'pink',
+                 'Lani':'gray', '3pan':'gold', '6pan':'black', '6panCenter':'gold',
+                 '2panBu': 'Cyan', '2panBuCenter': 'magenta', '2panBuOut': 'orange'}
     # Array of 3 plots using GridSpec
     fig = plt.figure(figsize=(16, 8), constrained_layout=True)
     # 2 rows × 3 cols:
@@ -51,23 +81,24 @@ if plot.lower() == 'y':
     # -------------------------
     contour_plot(fig, ax_contour, coils, axis_path, coil_colors=coil_colors)
     ax_contour.legend()
+    ax_contour.plot(rt.ports[:, 0], rt.ports[:, 1], 'o', label='Ports', color='black')
 
 
     # -------------------------
     # Top-right: |B| along axis (total)
     # -------------------------
     axis_field_plot(ax_axis, coils, axis_path)
+    #ax_axis.plot(scoord[idx_4panS[1]:idx_4panS[2]], B_ripple, color='purple')
+
 
     # =====================================================
     # Bottom-right: |B| on axis from each COIL TYPE
     # =====================================================
     for coil in coils:
-        if coil.type == 'BLUECENTER':
-            coil.type = 'BLUE'
-        elif coil.type == '12PANCENTER':
-            coil.type = '12PAN'
-        elif coil.type == '6PANCENTER':
-            coil.type = '6PAN'
+        if coil.type.endswith('Center'):
+            coil.type = coil.type[:-6]
+        elif coil.type.endswith('Inner'):
+            coil.type = coil.type[:-5]
     axis_field_plot_by_coil(ax_blank, coils, axis_path, coil_colors=coil_colors)
 
     ax_contour.legend()

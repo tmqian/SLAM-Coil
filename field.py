@@ -59,7 +59,7 @@ def get_coil_models():
 
 class Coil:
 
-    def __init__(self, Xc=1, Yc=1, angle=90, type=None):
+    def __init__(self, Xc=1, Yc=1, angle=90, type=None, check_csv=True):
         '''
         (Xc,Yc) is the COM of the coil
         angle is of the plane of the coil in degrees, 0 is +xaxis
@@ -74,16 +74,18 @@ class Coil:
             raise ValueError("Coil type string is required (e.g. 'OM', 'L2').")
         self.type = type.strip()
 
-        models = get_coil_models()
-        if self.type not in models:
-            raise ValueError(f"Unknown coil type '{self.type}'. Add it to coil-model.csv.")
-        model = models[self.type]
+        model = {}
+        if check_csv == True:
+            models = get_coil_models()
+            if self.type not in models:
+                raise ValueError(f"Unknown coil type '{self.type}'. Add it to coil-model.csv.")
+            model = models[self.type]
 
-        self.ID = float(model['ID'])
-        self.OD = float(model['OD'])
-        self.DZ = float(model['DZ'])
-        self.Nr = int(model['Nr'])
-        self.Nz = int(model['Nz'])
+        self.ID = float(model.get('ID', 1))
+        self.OD = float(model.get('OD', 2))
+        self.DZ = float(model.get('DZ', 1))
+        self.Nr = int(model.get('Nr', 1))
+        self.Nz = int(model.get('Nz', 1))
         self.nr = max(1, int(model.get('nr', self.Nr)))
         self.nz = max(1, int(model.get('nz', self.Nz)))
         self.current = float(model.get('current', 0.0))
@@ -95,8 +97,9 @@ class Coil:
         self._basis_e3 = np.cross(self._basis_e1, self._basis_e2)
         self._basis = np.stack([self._basis_e1, self._basis_e2, self._basis_e3], axis=1)
         self._basis_T = self._basis.T
-        self.parallel =  False if int(model['parallel']) == 0 else True
-        self.parallel_partitions = int(model['partitions'])
+        self.parallel =  False if int(model.get('parallel', 0)) == 0 else True
+        self.parallel_partitions = int(model.get('partitions', 0))
+        self.id = 0
 
     @staticmethod
     def _build_midpoints(start, stop, count):
@@ -276,7 +279,7 @@ class Coil:
         return V_coil
 
 
-def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
+def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT, loop = True):
     """Linearly interpolate between COM points to approximate the magnetic axis."""
     points = np.asarray(points, dtype=float)
     if len(points) < 2:
@@ -286,7 +289,8 @@ def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT):
         ts = np.linspace(0.0, 1.0, samples_per_segment, endpoint=False)
         for t in ts:
             segments.append(start + t * (end - start))
-    segments.append(points[-1])
+    if loop:
+        segments.append(points[-1])
     return np.vstack(segments)
 
 
@@ -332,10 +336,10 @@ def print_total_coil_params(coils):
     print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
 
-def get_coil_info(coil_info, interpolate=True, L=1.5, R=0.5):
+def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
-    df = pd.read_csv(coil_info).dropna(how='all')
+    df = pd.read_csv(test_file).dropna(how='all')
     df.columns = df.columns.str.strip()  # fix headers
     coils = [Coil(**row) for row in df.to_dict('records')]
     axis_xy = df[['Xc', 'Yc']].to_numpy()
@@ -355,8 +359,7 @@ def get_coil_info(coil_info, interpolate=True, L=1.5, R=0.5):
             y = R*np.sin(angle)
             axis_xy[i+9,:] = np.array([x, y])
             axis_xy[i+37,:] = np.array([-x, -y])
-        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
-    axis_path = np.vstack([axis_path, axis_path[0:1]])
+        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment, loop = loop)
 
     return coils, axis_path
 
