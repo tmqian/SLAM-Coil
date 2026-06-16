@@ -28,7 +28,7 @@ GRID_RES_Y = 80
 X_RANGE = (-2, 2)
 Y_RANGE = (-2, 2)
 CU_DENSITY = 8960  #kg/m^3
-COIL_MODEL_FILE = 'coil_models/coil_model_lars.csv'
+COIL_MODEL_FILE = 'coil_models/coil_model.csv'
 
 
 def get_coil_models():
@@ -99,6 +99,7 @@ class Coil:
         self._basis_T = self._basis.T
         self.parallel =  False if int(model.get('parallel', 0)) == 0 else True
         self.parallel_partitions = int(model.get('partitions', 0))
+        self.id = 0
 
     @staticmethod
     def _build_midpoints(start, stop, count):
