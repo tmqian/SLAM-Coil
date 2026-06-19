@@ -1,5 +1,6 @@
 
 from racetrack import *
+from optimize_ripple import *
 
 """Testing ways to make it easer to adjust coil positions"""
 
@@ -8,9 +9,9 @@ center_types = ['Blue', 'Lani1', 'Lani2', 'BlueInner', 'LaniCenter1', 'LaniCente
 
 Mirror_Length = 1.5
 Stellerator_Radius = 0.5
-filename = "test_files/racetrack_4x5_5Blue_smallerID.csv"
+filename = "test_files/racetrack4.csv"
 sd = {'Brown': -0.15, 'OM': 0}
-disp_angle = 1.5 # positive toward blue, negative away from blue
+disp_angle = -0.4 # positive toward blue, negative away from blue
 cd = {'Blue': 0, 'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle}
 
 rt = Racetrack(Mirror_Length, 
@@ -19,8 +20,8 @@ rt = Racetrack(Mirror_Length,
                          center_types,
                          straight_displacements=None,center_displacements=cd,
                          filename=filename)
-rt.build_coils()
-
+rt.build_coils()    
+Optimize(plot=False, rt=rt, coil_ref='Lani', coil_idx=0, target_B=0.25)
 
 rt.write_csv()
 center, center_space, straight = rt.build_ports(r = 0.47, rho=0.5)
@@ -38,19 +39,21 @@ with open('ports.csv', 'w', newline='') as csvfile:
         writer.writerow([f"{port:.6f}", f"{space:.6f}"])
 
 
-coils, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
+_, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
 axis_path = np.vstack([axis_path, axis_path[0]])  # close the loop
 
+B_mag, s_coord = get_Bmag_on_axis(rt.coils, axis_path)
 
-# blue_scoord, idx_4panS = get_coil_scoord(rt.coils, axis_path, '4panS')
-# print(f"4panS coil s-coordinates: {blue_scoord}")
-# B_ripple, scoord = get_Bmag_on_axis(rt.coils, axis_path)
-# B_ripple = B_ripple[idx_4panS[1]:idx_4panS[2]]
-# plt.plot(scoord[idx_4panS[1]:idx_4panS[2]], B_ripple, label='4panS Coil B-field', linestyle='-', color='purple')
-# ripple = (B_ripple.max() - B_ripple.min()) / B_ripple.mean()
-# print(f"Ripple for 4panS coil: {ripple:.2%}")
-# plt.xlabel('s (m)')
-# plt.ylabel('|B| (T)')
+s_ends, idx_ends = get_coil_scoord(rt.coils, axis_path, 'Blue')
+
+B_mag_center = B_mag[idx_ends[0]:idx_ends[1]]
+s_coord_center = s_coord[idx_ends[0]:idx_ends[1]]
+
+peak_idx, _ = find_peaks(B_mag_center)
+trough_idx, _ = find_peaks(-B_mag_center)
+
+ripple = (np.max(B_mag_center[peak_idx]) - np.min(B_mag_center[trough_idx])) / np.max(B_mag_center)
+print(f"Ripple for Center coil: {ripple:.4%}")
 
 plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
@@ -79,7 +82,7 @@ if plot.lower() == 'y':
     # -------------------------
     # Left: planar |B| contour
     # -------------------------
-    contour_plot(fig, ax_contour, coils, axis_path, coil_colors=coil_colors)
+    contour_plot(fig, ax_contour, rt.coils, axis_path, coil_colors=coil_colors)
     ax_contour.legend()
     ax_contour.plot(rt.ports[:, 0], rt.ports[:, 1], 'o', label='Ports', color='black')
 
@@ -87,19 +90,19 @@ if plot.lower() == 'y':
     # -------------------------
     # Top-right: |B| along axis (total)
     # -------------------------
-    axis_field_plot(ax_axis, coils, axis_path)
+    axis_field_plot(ax_axis, rt.coils, axis_path)
     #ax_axis.plot(scoord[idx_4panS[1]:idx_4panS[2]], B_ripple, color='purple')
 
 
     # =====================================================
     # Bottom-right: |B| on axis from each COIL TYPE
     # =====================================================
-    for coil in coils:
+    for coil in rt.coils:
         if coil.type.endswith('Center'):
             coil.type = coil.type[:-6]
         elif coil.type.endswith('Inner'):
             coil.type = coil.type[:-5]
-    axis_field_plot_by_coil(ax_blank, coils, axis_path, coil_colors=coil_colors)
+    axis_field_plot_by_coil(ax_blank, rt.coils, axis_path, coil_colors=coil_colors)
 
     ax_contour.legend()
     plt.show()

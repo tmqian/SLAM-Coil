@@ -211,6 +211,16 @@ class Racetrack:
                 )
         print(f"Wrote {len(self.coils)} coils to {path}")
 
+    def read_csv(self):
+        path = Path(__file__).parent / self.filename
+        coils = []
+        with path.open("r") as fp:
+            reader = csv.DictReader(fp)
+            for row in reader:
+                coil = Coil(float(row["Xc"]), float(row["Yc"]), float(row["angle"]), row["type"])
+                coils.append(coil)
+        return coils
+
     def build_ports(self, straight=True, center=True, r = None, rho= None):
 
         r = self.Stellerator_Radius if r is None else r
@@ -223,7 +233,6 @@ class Racetrack:
         s_ports_center = []
         s_ports_straight = []
 
-        # Separate into the 4 sections by position
         right_arc       = [c.angle for c in self.coils if c.type in self.center_types and c.Xc > 0]
         left_arc        = [c.angle for c in self.coils if c.type in self.center_types and c.Xc < 0]
         top_straight    = [c.Xc for c in self.coils if c.type in self.straight_types and c.Yc > 0]
