@@ -336,7 +336,7 @@ def print_total_coil_params(coils):
     print(f"  Total Coil Mass: {total_mass:.2f} kg")
 
 
-def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
+def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop=True, toroid_trans=0):
     '''Returns a list of coils and the magnetic axis
        path as an array of points in the xy-plane.'''
     df = pd.read_csv(test_file).dropna(how='all')
@@ -349,6 +349,7 @@ def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
     else:
         axis_samples_per_segment = 5
         axis_xy = np.zeros((56, 2))
+        L += toroid_trans*2
         for i in range(9):
             x = -L/2 + L/8*i
             axis_xy[i,:] = np.array([x, R])
@@ -363,7 +364,7 @@ def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop = True):
 
     return coils, axis_path
 
-def get_axis_path(coils, interpolate=True, L=1.5, R=0.5):
+def get_axis_path(coils, interpolate=True, L=1.5, R=0.5, toroid_trans=0):
     '''Returns the magnetic axis path as an array of points in the xy-plane.'''
     axis_xy = np.array([[coil.Xc, coil.Yc] for coil in coils])
     if interpolate == True:
@@ -371,6 +372,7 @@ def get_axis_path(coils, interpolate=True, L=1.5, R=0.5):
     else:
         axis_samples_per_segment = 5
         axis_xy = np.zeros((56, 2))
+        L += toroid_trans*2
         for i in range(9):
             x = -L/2 + L/8*i
             axis_xy[i,:] = np.array([x, R])
@@ -422,7 +424,7 @@ def get_coil_scoord(coils, axis_path, typ):
 #     Plots    #
 ################
 
-def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', levels=32, extend='neither', coil_colors={}):
+def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', levels=32, extend='neither', coil_colors={}, just_coils=False):
     '''Creates a contour plot of |B| on the xy-plane.
        Side effects on the inputs fig and ax.'''
     x_range = X_RANGE
@@ -438,8 +440,9 @@ def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', 
     if field_units == 'G':
         Bplane = Bplane * 10000
 
-    contour = ax.contourf(xs, ys, Bplane, levels=levels, cmap='jet', alpha=0.7, extend=extend)
-    fig.colorbar(contour, ax=ax, label=f'|B| in plane ({field_units})')
+    if just_coils == False:
+        contour = ax.contourf(xs, ys, Bplane, levels=levels, cmap='jet', alpha=0.7, extend=extend)
+        fig.colorbar(contour, ax=ax, label=f'|B| in plane ({field_units})')
 
     for coil in coils:
         coil.draw(
@@ -486,12 +489,21 @@ def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', fi
     else:
         ax.plot(s_coord, B_mag, lw=2, color=color, label=label)
 
+    const = 4
+    ax_rad = ax.twinx()
+    ax_rad.plot(s_coord, const/np.sqrt(B_mag), color='green', label='Plasma Radius')
+    ax_rad.axhline(y=9.5, ls='--', color='black', lw=1, label='Limiting Plasma Radius')
+    ax_rad.legend(loc='lower right')
+
     if show_labels == True:
         ax.set_xlabel(f'Axis distance s ({length_units})')
         ax.set_ylabel(f'|B| ({field_units})')
         ax.set_title('|B| along magnetic axis: Rm = {:.2f}'.format(B_mag.max()/B_mag.min()))
+        ax_rad.set_ylabel('Radius (cm)')
     ax.grid(True)
+
     ax.set_ylim(bottom=0)
+    ax_rad.set_ylim(bottom=0)
 
     return B_mag
 
@@ -581,4 +593,3 @@ def axis_field_plot_by_coil(ax, coils, axis_path, show_labels=True, length_units
         ax.set_ylabel(f"|B| ({field_units})")
 
     ax.grid(True)
-    ax.legend()
