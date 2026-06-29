@@ -59,7 +59,7 @@ def get_coil_models():
 
 class Coil:
 
-    def __init__(self, Xc=1, Yc=1, angle=90, type=None, check_csv=True):
+    def __init__(self, Xc=1, Yc=1, angle=90, type=None, group = None, check_csv=True):
         '''
         (Xc,Yc) is the COM of the coil
         angle is of the plane of the coil in degrees, 0 is +xaxis
@@ -100,6 +100,7 @@ class Coil:
         self.parallel =  False if int(model.get('parallel', 0)) == 0 else True
         self.parallel_partitions = int(model.get('partitions', 0))
         self.id = 0
+        self.group = group
 
     @staticmethod
     def _build_midpoints(start, stop, count):
@@ -184,7 +185,7 @@ class Coil:
             Single 3-vector or Nx3 array of evaluation points in meters.
         current : float
             Total coil current in Amperes.
-
+_, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Stellerator_Radius)
         Returns
         -------
         numpy.ndarray

@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 
 
 df = pd.read_csv('possible-coil.csv')
+# Convert to numeric, turning bad data into NaN
+df['DZ'] = pd.to_numeric(df['DZ'], errors='coerce')
+
+# Drop any NaNs if you want to be safe, then filter
+df = df.dropna(subset=['DZ'])
+df = df[df['DZ'] <= 0.4]
 
 x = 1 / np.sqrt(df['ID'] * df['OD'])
 y = df['G_per_A']

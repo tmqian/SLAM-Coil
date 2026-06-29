@@ -3,10 +3,10 @@ from racetrack import *
 from scipy.signal import find_peaks
 from scipy.optimize import least_squares
 
-def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target_B: float = 0.25):
+def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target_B: float = 0.25, current_per_group: bool = False, current_per_type: bool = False):
     axis_path = get_axis_path(rt.coils, L=rt.Mirror_Length, R=rt.Stellerator_Radius, interpolate=False)
     B_mag, s_coord = get_Bmag_on_axis(rt.coils, axis_path)
-    _, idx_ends = get_coil_scoord(rt.coils, axis_path, coil_ref)
+    _, idx_ends = get_coil_scoord(rt.coils, axis_path, coil_ref)    
 
     
     def get_symmetric_group(coil, all_coils):
@@ -21,12 +21,50 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
         return group
 
     def B_field(s, currents):
-        first_quad_coils = [c for c in rt.coils if c.type in rt.center_types and c.Xc > 0 and c.Yc >= 0]
+        # first_quad_coils = [c for c in rt.coils if c.type in rt.center_types and c.Xc > 0 and c.Yc >= 0]
         
-        for (coil, I) in zip(first_quad_coils, currents):
-            group = get_symmetric_group(coil, rt.coils)
-            for symmetric_coil in group:
-                symmetric_coil.current = I
+        # for (coil, I) in zip(first_quad_coils, currents):
+        #     group = get_symmetric_group(coil, rt.coils)
+
+        #     for symmetric_coil in group:
+        #         if current_per_type:
+        #             for typ in rt.center_types:
+        #                 if coil.type == typ:
+        #                     for symmetric_coil in group:
+        #                         symmetric_coil.current = I
+        #         elif current_per_group:
+        #             for typ in rt.center_types:
+        #                 if coil.type == typ and coil.group in ["inner", "center", "outer"]:
+        #                     for symmetric_coil in group:
+        #                         symmetric_coil.current = I   
+        #         else:
+        #             for symmetric_coil in group:
+        #                 symmetric_coil.current = I
+
+        if current_per_type:
+            unique_types = sorted(list(set([c.type for c in rt.coils if c.type in rt.center_types])))
+            for typ, I in zip(unique_types, currents):
+                for coil in rt.coils:
+                    if coil.type == typ:
+                        coil.current = I
+
+        elif current_per_group:
+            valid_groups = ["inner", "center", "outer", None]
+            unique_combinations = sorted(list(set(
+                (c.type, c.group) for c in rt.coils 
+                if c.type in rt.center_types and c.group in valid_groups)))
+
+            for (typ, grp), I in zip(unique_combinations, currents):
+                for coil in rt.coils:
+                    if coil.type == typ and coil.group == grp:
+                        coil.current = I
+
+        else: 
+            first_quad_coils = [c for c in rt.coils if c.type in rt.center_types and c.Xc > 0 and c.Yc >= 0]
+            for (coil, I) in zip(first_quad_coils, currents):
+                group = get_symmetric_group(coil, rt.coils)
+                for symmetric_coil in group:
+                    symmetric_coil.current = I
 
         B_mag, _ = get_Bmag_on_axis(rt.coils, axis_path)
 

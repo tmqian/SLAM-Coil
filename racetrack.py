@@ -42,7 +42,7 @@ class Racetrack:
     def build_coils(self):
         self.coils = []
 
-        def add(x, y, angle_rad, ctype, id = 0):
+        def add(x, y, angle_rad, ctype, id = 0, group = None):
             self.coils.append(Coil(x, y, math.degrees(angle_rad), ctype))
             self.coils[-1].id = id
 
@@ -60,6 +60,14 @@ class Racetrack:
             typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
         
             add(x, self.Stellerator_Radius + self.mirror_shift, math.pi/2, f"{typ_base}", id = id)
+
+        # 3. BOTTOM STRAIGHT
+        # ---------------------------------------------------------
+        for x, ctype in zip(mx[::-1], self.straight_types):
+            match = re.search(r"\d+$", ctype)
+            id = int(match.group()) if match else 0
+            typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+            add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
         
 
         # ---------------------------------------------------------
@@ -72,6 +80,7 @@ class Racetrack:
         t_stop  = math.pi/2 - math.pi/(num_curve*2)
         
         centers = np.linspace(t_start, t_stop, num_curve)
+        group = None
 
         # ---------------------------------------------------------
         # 2. RIGHT ARC:
@@ -79,40 +88,49 @@ class Racetrack:
         cx = self.Mirror_Length/2
 
         for t_center, typ in zip(centers[::-1], self.center_types[::-1]):
-
             match = re.search(r"\d+$", typ)
             id = int(match.group()) if match else 0
             typ_base = re.sub(r"\d+$", "", typ) if match else typ
+
+            if "Inner" in typ_base:
+                group = "inner"
+                typ_base = re.sub(r"(?i)inner", "", typ_base)
+            elif "Center" in typ_base:
+                group = "center"
+                typ_base = re.sub(r"(?i)center", "", typ_base)
+            elif "Outer" in typ_base:
+                group = "outer"
+                typ_base = re.sub(r"(?i)outer", "", typ_base)
             
             add(cx + self.Stellerator_Radius*math.cos(t_center),
                     self.Stellerator_Radius*math.sin(t_center),
                     t_center,
-                    f"{typ_base}", id = id)
-
-        # ---------------------------------------------------------
-        # 3. BOTTOM STRAIGHT
-        # ---------------------------------------------------------
-        for x, ctype in zip(mx[::-1], self.straight_types):
-            match = re.search(r"\d+$", ctype)
-            id = int(match.group()) if match else 0
-            typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
-            add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
+                    f"{typ_base}", id = id, group=group)
 
         # ---------------------------------------------------------
         # 4. LEFT ARC
         # ---------------------------------------------------------
 
-        for t_center, typ in zip(centers, self.center_types):
-
+        for t_center, typ in zip(centers[::-1], self.center_types[::-1]):
             match = re.search(r"\d+$", typ)
             id = int(match.group()) if match else 0
             typ_base = re.sub(r"\d+$", "", typ) if match else typ
 
+            if "Inner" in typ_base:
+                group = "inner"
+                typ_base = re.sub(r"(?i)inner", "", typ_base)
+            elif "Center" in typ_base:
+                group = "center"
+                typ_base = re.sub(r"(?i)center", "", typ_base)
+            elif "Outer" in typ_base:
+                group = "outer"
+                typ_base = re.sub(r"(?i)outer", "", typ_base)
+            
             add(-cx - self.Stellerator_Radius*math.cos(t_center),
                     self.Stellerator_Radius*math.sin(t_center),
-                    math.pi - t_center,
-                    f"{typ_base}", id = id)
-                
+                    np.pi - t_center,
+                    f"{typ_base}", id = id, group=group)
+            
         #shift coils in sstraight sections if needed
         for coil in self.coils:
             if coil.type in self.straight_types:
@@ -273,4 +291,23 @@ class Racetrack:
         self.ports = np.array(self.ports)
 
         return np.array(angle_right.tolist() + angle_left.tolist()), np.abs(s_ports_center*100),  np.array(xpos_top)
+    
+    def shift_stellerator(self, shift):
+        center_coils = [c for c in self.coils if c.type in self.center_types]
+        for coil in center_coils:
+            if coil.Xc > 0:
+                coil.Xc += shift
+            elif coil.Xc < 0:
+                coil.Xc -= shift
 
+    def set_coil_current(self, coil_type, current, coil_group = None):
+        for coil in self.coils:
+            if coil.type == coil_type and coil.group == coil_group:
+                coil.current = current
+
+    def select_port(self, port_idx):
+        if self.ports is None:
+            raise ValueError("Ports have not been built yet. Call build_ports() first.")
+        if port_idx < 0 or port_idx >= len(self.ports):
+            raise IndexError("Port index out of range.")
+        self.ports = self.ports[port_idx]
