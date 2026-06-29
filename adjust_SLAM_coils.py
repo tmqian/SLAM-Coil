@@ -21,7 +21,7 @@ rt = Racetrack(Mirror_Length,
                          straight_displacements=None,center_displacements=cd,
                          filename=filename)
 rt.build_coils()    
-Optimize(plot=False, rt=rt, coil_ref='Lani', coil_idx=0, target_B=0.25)
+# Optimize(plot=False, rt=rt, coil_ref='Lani', coil_idx=0, target_B=0.25)
 
 rt.write_csv()
 center, center_space, straight = rt.build_ports(r = 0.47, rho=0.5)
