@@ -1,9 +1,10 @@
 # pyright: standard
-
-import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+
 import field
-from field import Coil, interpolate_axis, AXIS_SAMPLES_PER_SEGMENT, CU_DENSITY
+from field import AXIS_SAMPLES_PER_SEGMENT, CU_DENSITY, Coil, interpolate_axis
 
 # This script generates a CSV of possible coil geometries and their properties (G/A, length, mass, etc.) for a single coil design.
 # It iterates over a range of outer diameters (OD), inner diameters (ID), and axial lengths (DZ)
@@ -83,8 +84,6 @@ results_df = pd.DataFrame(results).sort_values("G_per_A").reset_index(drop=True)
 results_df.to_csv("possible-coil.csv", index=False)
 print(f"Saved {len(results)} results to possible-coil.csv")
 
-
-import matplotlib.pyplot as plt
 
 for OD in [0.4, 0.5]:
     subset = results_df[results_df["OD"] == OD]
