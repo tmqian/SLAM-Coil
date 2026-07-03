@@ -3,8 +3,8 @@ from racetrack import *
 from scipy.signal import find_peaks
 from scipy.optimize import least_squares
 
-def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target_B: float = 0.25, current_per_group: bool = False, current_per_type: bool = False):
-    axis_path = get_axis_path(rt.coils, L=rt.Mirror_Length, R=rt.Stellerator_Radius, interpolate=False)
+def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target_B: float = 0.25):
+    axis_path = rt.axis_path
     B_mag, s_coord = get_Bmag_on_axis(rt.coils, axis_path)
     _, idx_ends = get_coil_scoord(rt.coils, axis_path, coil_ref)    
 
@@ -91,7 +91,7 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
     #----------------"real time" plotting----------------
     it_counter = 0
     def plot_callback(xk):
-        global it_counter
+        nonlocal it_counter
         it_counter += 1
 
         B_mag, _ = get_Bmag_on_axis(rt.coils, axis_path)

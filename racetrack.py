@@ -17,17 +17,22 @@ import numpy as np
 from field import *
 
 class Racetrack:
-    def __init__(self, Mirror_Length, Stellerator_Radius, straight_types, center_types, straight_displacements=None, center_displacements=None, filename=None):
+    def __init__(self, Mirror_Length, Stellerator_Radius, straight_types, conv_types, center_types, straight_displacements=None, conv_displacements=None, center_displacements=None, filename=None, toroid_trans=0):
         self.Mirror_Length = Mirror_Length
         self.Stellerator_Radius = Stellerator_Radius
         self.straight_types = straight_types
+        self.conv_types = conv_types
         self.center_types = center_types
         self.filename = filename
+        self.toroid_trans = toroid_trans
         self.coils = None
         self.straight_displacements = straight_displacements or {typ: 0 for typ in straight_types}
+        self.conv_displacements = conv_displacements or {typ: 0 for typ in conv_types}
         self.center_displacements = center_displacements or {typ: 0 for typ in center_types}
         self.mirror_shift = 0
         self.ports = None
+        self.axis_path = None
+        self.Blue90 = False  # Default value for Blue90
 
         for typ in straight_types:
             if typ not in self.straight_displacements:
@@ -36,6 +41,10 @@ class Racetrack:
         for typ in center_types:
             if typ not in self.center_displacements:
                 self.center_displacements[typ] = 0
+        if conv_types is not None:
+            for typ in conv_types:
+                if typ not in self.conv_displacements:
+                    self.conv_displacements[typ] = 0
 
 
     
@@ -69,6 +78,48 @@ class Racetrack:
             typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
             add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
         
+        #------------------------------------------
+        #Transition sections:
+        #-------------------------------------------
+        if self.conv_types is not None:
+            num_conv = len(self.conv_types)
+            mx_conv_R = midpoints(self.Mirror_Length/2, self.Mirror_Length/2 + self.toroid_trans/2, num_conv)
+            mx_conv_L = midpoints(-self.Mirror_Length/2 - self.toroid_trans/2, -self.Mirror_Length/2, num_conv)
+
+            #top
+            for x, ctype in zip (mx_conv_R, self.conv_types):
+                match = re.search(r"\d+$", ctype)
+                id = int(match.group()) if match else 0
+                typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+                add(x, self.Stellerator_Radius + self.mirror_shift, math.pi/2, f"{typ_base}", id = id)
+            for x, ctype in zip (mx_conv_L[::-1], self.conv_types): #must reverse left so ordering mirrors the right
+                match = re.search(r"\d+$", ctype)
+                id = int(match.group()) if match else 0
+                typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+                add(x, self.Stellerator_Radius + self.mirror_shift, math.pi/2, f"{typ_base}", id = id)
+
+            #bottom
+            for x, ctype in zip (mx_conv_R, self.conv_types):
+                match = re.search(r"\d+$", ctype)
+                id = int(match.group()) if match else 0
+                typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+                add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
+
+            for x, ctype in zip (mx_conv_L[::-1], self.conv_types):
+                match = re.search(r"\d+$", ctype)
+                id = int(match.group()) if match else 0
+                typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+                add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
+
+        # ---------------------------------------------------------
+        # 3. BOTTOM STRAIGHT
+        # ---------------------------------------------------------
+        for x, ctype in zip(mx[::-1], self.straight_types):
+            match = re.search(r"\d+$", ctype)
+            id = int(match.group()) if match else 0
+            typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
+            add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
+
 
         # ---------------------------------------------------------
         # CURVED SECTIONS:
@@ -76,11 +127,14 @@ class Racetrack:
         
         num_curve = len(self.center_types) 
 
-        t_start = -math.pi/2 + math.pi/(num_curve*2)
-        t_stop  = math.pi/2 - math.pi/(num_curve*2)
+        if not self.Blue90:
+            t_start = -math.pi/2 + math.pi/(num_curve*2)
+            t_stop  = math.pi/2 - math.pi/(num_curve*2)
+        else:
+            t_start = -math.pi/2 
+            t_stop  = math.pi/2
         
         centers = np.linspace(t_start, t_stop, num_curve)
-        group = None
 
         # ---------------------------------------------------------
         # 2. RIGHT ARC:
@@ -88,25 +142,15 @@ class Racetrack:
         cx = self.Mirror_Length/2
 
         for t_center, typ in zip(centers[::-1], self.center_types[::-1]):
+        
             match = re.search(r"\d+$", typ)
             id = int(match.group()) if match else 0
             typ_base = re.sub(r"\d+$", "", typ) if match else typ
-
-            if "Inner" in typ_base:
-                group = "inner"
-                typ_base = re.sub(r"(?i)inner", "", typ_base)
-            elif "Center" in typ_base:
-                group = "center"
-                typ_base = re.sub(r"(?i)center", "", typ_base)
-            elif "Outer" in typ_base:
-                group = "outer"
-                typ_base = re.sub(r"(?i)outer", "", typ_base)
-            
+        
             add(cx + self.Stellerator_Radius*math.cos(t_center),
                     self.Stellerator_Radius*math.sin(t_center),
                     t_center,
-                    f"{typ_base}", id = id, group=group)
-
+                    f"{typ_base}", id = id)
         # ---------------------------------------------------------
         # 4. LEFT ARC
         # ---------------------------------------------------------
@@ -138,6 +182,25 @@ class Racetrack:
                     coil.Xc += self.straight_displacements[coil.type]
                 elif coil.Xc < 0:
                     coil.Xc -= self.straight_displacements[coil.type]
+            if self.conv_types is not None:
+                if coil.type in self.conv_types:
+                    if coil.Xc > 0:
+                        coil.Xc += self.conv_displacements[coil.type]
+                    elif coil.Xc < 0:
+                        coil.Xc -= self.conv_displacements[coil.type]
+            if coil.id != 0:
+                ctype = coil.type + str(coil.id)
+                if ctype in self.straight_types:
+                    if coil.Xc > 0:
+                        coil.Xc += self.straight_displacements[ctype]
+                    elif coil.Xc < 0:
+                        coil.Xc -= self.straight_displacements[ctype]
+                if self.conv_types is not None:
+                    if ctype in self.conv_types:
+                        if coil.Xc > 0:
+                            coil.Xc += self.conv_displacements[ctype]
+                        elif coil.Xc < 0:
+                            coil.Xc -= self.conv_displacements[ctype]
 
         #shift coils in curved sections if needed
 
@@ -163,29 +226,43 @@ class Racetrack:
                         coil.Xc = (X - self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) + self.Mirror_Length/2
                         coil.Yc = (X - self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
                         coil.angle -= self.center_displacements[coil.type]
+                    if coil.Xc > 0:
+                        coil.Xc += self.toroid_trans
+                    elif coil.Xc < 0:
+                        coil.Xc -= self.toroid_trans
             #shift coils by id from new positions if needed
             if coil.id != 0:
                 ctype = coil.type + str(coil.id)
                 if ctype in self.center_types:
+                    if coil.Xc > 0:
+                        coil.Xc -= self.toroid_trans
+                    elif coil.Xc < 0:
+                        coil.Xc += self.toroid_trans
                     X = coil.Xc
                     Y = coil.Yc
                     dtheta = math.pi/180 * self.center_displacements[ctype]
                     if coil.Xc > 0 and coil.Yc > 0:
-                        coil.Xc = (X - self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) + self.Mirror_Length/2
+                        coil.Xc = (X - self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) + self.Mirror_Length/2 + self.toroid_trans
                         coil.Yc = (X - self.Mirror_Length/2) * math.sin(dtheta) + Y * math.cos(dtheta)
                         coil.angle += self.center_displacements[ctype]
                     elif coil.Xc < 0 and coil.Yc > 0:
-                        coil.Xc = (X + self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) - self.Mirror_Length/2
+                        coil.Xc = (X + self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) - self.Mirror_Length/2 - self.toroid_trans
                         coil.Yc = (X + self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
                         coil.angle -= self.center_displacements[ctype]
                     elif coil.Xc < 0 and coil.Yc < 0:
-                        coil.Xc = (X + self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) - self.Mirror_Length/2
+                        coil.Xc = (X + self.Mirror_Length/2) *math.cos(dtheta) - Y * math.sin(dtheta) - self.Mirror_Length/2 - self.toroid_trans
                         coil.Yc = (X + self.Mirror_Length/2) * math.sin(dtheta) + Y * math.cos(dtheta)
                         coil.angle += self.center_displacements[ctype]
                     elif coil.Xc > 0 and coil.Yc < 0:
-                        coil.Xc = (X - self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) + self.Mirror_Length/2
+                        coil.Xc = (X - self.Mirror_Length/2) *math.cos(-dtheta) - Y * math.sin(-dtheta) + self.Mirror_Length/2 + self.toroid_trans
                         coil.Yc = (X - self.Mirror_Length/2) * math.sin(-dtheta) + Y * math.cos(-dtheta)
                         coil.angle -= self.center_displacements[ctype]
+                    if coil.Xc > 0:
+                        coil.Xc += self.toroid_trans
+                    elif coil.Xc < 0:
+                        coil.Xc -= self.toroid_trans
+        
+        self.axis_path = get_axis_path(self.coils, L=self.Mirror_Length, R=self.Stellerator_Radius,interpolate=False, toroid_trans=self.toroid_trans)
 
 
         #Filter coil types by removing trailing digits for port calculations
@@ -229,16 +306,6 @@ class Racetrack:
                 )
         print(f"Wrote {len(self.coils)} coils to {path}")
 
-    def read_csv(self):
-        path = Path(__file__).parent / self.filename
-        coils = []
-        with path.open("r") as fp:
-            reader = csv.DictReader(fp)
-            for row in reader:
-                coil = Coil(float(row["Xc"]), float(row["Yc"]), float(row["angle"]), row["type"])
-                coils.append(coil)
-        return coils
-
     def build_ports(self, straight=True, center=True, r = None, rho= None):
 
         r = self.Stellerator_Radius if r is None else r
@@ -251,6 +318,7 @@ class Racetrack:
         s_ports_center = []
         s_ports_straight = []
 
+        # Separate into the 4 sections by position
         right_arc       = [c.angle for c in self.coils if c.type in self.center_types and c.Xc > 0]
         left_arc        = [c.angle for c in self.coils if c.type in self.center_types and c.Xc < 0]
         top_straight    = [c.Xc for c in self.coils if c.type in self.straight_types and c.Yc > 0]
@@ -300,14 +368,46 @@ class Racetrack:
             elif coil.Xc < 0:
                 coil.Xc -= shift
 
-    def set_coil_current(self, coil_type, current, coil_group = None):
+
+    def set_coil_currents(self, coil_typ, current):
         for coil in self.coils:
-            if coil.type == coil_type and coil.group == coil_group:
+            if coil.type == coil_typ:
                 coil.current = current
 
-    def select_port(self, port_idx):
-        if self.ports is None:
-            raise ValueError("Ports have not been built yet. Call build_ports() first.")
-        if port_idx < 0 or port_idx >= len(self.ports):
-            raise IndexError("Port index out of range.")
-        self.ports = self.ports[port_idx]
+    def set_straight_displacements(self, displacements):
+        for typ, disp in displacements.items():
+            if typ in self.straight_types:
+                self.straight_displacements[typ] = disp
+            else:
+                raise ValueError(f"Type {typ} not found in straight_types.")
+            
+    def set_center_displacements(self, displacements):
+        for typ, disp in displacements.items():
+            if typ in self.center_types:
+                self.center_displacements[typ] = disp
+            else:
+                raise ValueError(f"Type {typ} not found in center_types.")
+            
+    def reset(self, Mirror_Length, Stellerator_Radius, straight_types, center_types, straight_displacements=None, center_displacements=None, filename=None, toroid_trans=0):
+        self.Mirror_Length = Mirror_Length
+        self.Stellerator_Radius = Stellerator_Radius
+        self.straight_types = straight_types
+        self.center_types = center_types
+        self.filename = filename
+        self.toroid_trans = toroid_trans
+        self.coils = None
+        self.straight_displacements = straight_displacements or {typ: 0 for typ in straight_types}
+        self.center_displacements = center_displacements or {typ: 0 for typ in center_types}
+        self.mirror_shift = 0
+        self.ports = None
+        self.axis_path = None
+        self.Blue90 = False  # Default value for Blue90
+
+        for typ in straight_types:
+            if typ not in self.straight_displacements:
+                self.straight_displacements[typ] = 0
+
+        for typ in center_types:
+            if typ not in self.center_displacements:
+                self.center_displacements[typ] = 0
+
