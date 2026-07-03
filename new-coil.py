@@ -3,12 +3,12 @@ import pandas
 import numpy as np
 from field import *
 
-typ = '2panBv1'
-ID= 0.3
-Nr = 23
-Nz= 2
-dr = 0.00252
-dz = 0.0381
+typ = 'Lani_1pp'
+ID= 0.30
+Nr = 10
+Nz= 4
+dr = 0.01
+dz = 0.01
 
 OD = ID + 2*Nr*dr
 DZ = Nz*dz

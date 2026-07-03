@@ -364,7 +364,7 @@ def get_coil_info(test_file, interpolate=True, L=1.5, R=0.5, loop=True, toroid_t
 
     return coils, axis_path
 
-def get_axis_path(coils, interpolate=True, L=1.5, R=0.5, toroid_trans=0):
+def get_axis_path(coils, interpolate=True, L=1.5, R=0.5, toroid_trans=0, loop=True):
     '''Returns the magnetic axis path as an array of points in the xy-plane.'''
     axis_xy = np.array([[coil.Xc, coil.Yc] for coil in coils])
     if interpolate == True:
@@ -383,8 +383,9 @@ def get_axis_path(coils, interpolate=True, L=1.5, R=0.5, toroid_trans=0):
             y = R*np.sin(angle)
             axis_xy[i+9,:] = np.array([x, y])
             axis_xy[i+37,:] = np.array([-x, -y])
-        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment)
-    axis_path = np.vstack([axis_path, axis_path[0:1]])
+        axis_path = interpolate_axis(axis_xy, axis_samples_per_segment, loop=loop)
+    if loop:
+        axis_path = np.vstack([axis_path, axis_path[0:1]])
     return axis_path
 
 def get_Bmag_on_axis(coils, axis_path, length_units='m', field_units='T'):
@@ -469,7 +470,7 @@ def contour_plot(fig, ax, coils, axis_path, show_labels=True, length_units='m', 
     ax.grid(True)
 
 
-def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', field_units='T', color='blue', label=''):
+def axis_field_plot(ax, coils, axis_path, show_labels=True, plasma_rad = True, length_units='m', field_units='T', color='blue', label=''):
     '''Returns |B| along the magnetic axis.
        Side effects on the input ax.'''
     axis_points = np.column_stack([axis_path, np.zeros(len(axis_path))])
@@ -489,11 +490,12 @@ def axis_field_plot(ax, coils, axis_path, show_labels=True, length_units='m', fi
     else:
         ax.plot(s_coord, B_mag, lw=2, color=color, label=label)
 
-    const = 4
+    const = 4/1.3
     ax_rad = ax.twinx()
-    ax_rad.plot(s_coord, const/np.sqrt(B_mag), color='green', label='Plasma Radius')
-    ax_rad.axhline(y=9.5, ls='--', color='black', lw=1, label='Limiting Plasma Radius')
-    ax_rad.legend(loc='lower right')
+    if plasma_rad:
+        ax_rad.plot(s_coord, const/np.sqrt(B_mag), color='green', label='Plasma Radius')
+        ax_rad.axhline(y=9.5, ls='--', color='black', lw=1, label='Limiting Plasma Radius')
+        ax_rad.legend(loc='lower right')
 
     if show_labels == True:
         ax.set_xlabel(f'Axis distance s ({length_units})')

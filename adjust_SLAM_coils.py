@@ -1,29 +1,51 @@
 
 from racetrack import *
+import os
+from optimize_ripple import Optimize
 
 """Testing ways to make it easer to adjust coil positions"""
 
 straight_types = ["Brown", "OM","OMCenter","OM", "Brown"]
 #center_types = ['Blue', 'Lani1', 'Lani2', 'BlueInner', 'LaniCenter1', 'LaniCenter2', 'BlueCenter', 'LaniCenter2', 'LaniCenter1', 'BlueInner', 'Lani2', 'Lani1', 'Blue']
 center_types = ['Blue', 'L1', 'L2', 'BlueInner', 'LCenter1', 'LCenter2', 'BlueCenter', 'LCenter2', 'LCenter1', 'BlueInner', 'L2', 'L1', 'Blue']
+#center_types = ['Blue', 'Lani', 'LaniInner1', 'BlueInner', 'LaniInner2', 'LaniCenter', 'BlueCenter', 'LaniCenter', 'LaniInner2', 'BlueInner', 'LaniInner1', 'Lani', 'Blue']
+# center_types = ['Blue', 'LaniPP', 'LaniPPInner1','BlueInner', 'LaniPPInner2', 'LaniPPCenter', 'BlueCenter', 'LaniPPCenter', 'LaniPPInner2', 'BlueInner', 'LaniPPInner1', 'LaniPP', 'Blue']
 
+
+conv_types = None
+conv_displacements = {'ConvB1': -0.03, 'ConvB2': 0}
 Mirror_Length = 1.5
 Stellerator_Radius = 0.5
-filename = "test_files/racetrack_5Blue_withL2.csv"
-sd = {'Brown': -0.15, 'OM': 0}
-disp_angle = 1.46 # positive away from blue, negative toward blue
+filename = "test_files/racetrack_lani_optim.csv"
+sd = {'Brown': 0.044, 'OM': 0}
+disp_angle = 1.5 # positive away from blue, negative toward blue
 cd = {'Blue': 0, 'L1':-disp_angle, 'L2':disp_angle, 'L3':disp_angle, 'LCenter1':-disp_angle, 'LCenter2':disp_angle, 'LCenter3':disp_angle,
-      'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle}
-toroid_trans = 0.06
+      'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle,
+      'Lani':-disp_angle, 'LaniInner1':disp_angle, 'LaniInner2':-disp_angle, 'LaniCenter':disp_angle}
+
+toroid_trans = 0.04
+optimize = False
+
+cd = {'Blue': 0, 'L1':-disp_angle, 'L2':disp_angle, 'L3':disp_angle, 'LCenter1':-disp_angle, 'LCenter2':disp_angle, 'LCenter3':disp_angle,
+    'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle,
+    'Lani':-disp_angle, 'LaniInner1':disp_angle, 'LaniInner2':-disp_angle, 'LaniCenter':disp_angle}
 
 rt = Racetrack(Mirror_Length, 
-                         Stellerator_Radius,
-                         straight_types,
-                         center_types,
-                         straight_displacements=None,center_displacements=cd,
-                         filename=filename,
-                         toroid_trans=toroid_trans)
+                        Stellerator_Radius,
+                        straight_types,
+                        conv_types,
+                        center_types,
+                        straight_displacements=sd,center_displacements=cd,conv_displacements=conv_displacements,
+                        filename=filename,
+                        toroid_trans=toroid_trans)
+rt.Blue90 = True
 rt.build_coils()
+if optimize:
+    Optimize(plot=True, rt=rt, coil_ref='Blue', coil_idx=0, target_B=0.25)
+
+for coil in rt.coils:
+    coil.current = coil.current/1.3
+
 
 
 rt.write_csv()
@@ -41,28 +63,26 @@ with open('ports.csv', 'w', newline='') as csvfile:
     for port, space in zip(center, center_space):
         writer.writerow([f"{port:.6f}", f"{space:.6f}"])
 
+coils = rt.coils
+axis_path = rt.axis_path
 
-coils, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Stellerator_Radius, toroid_trans=toroid_trans)
-axis_path = np.vstack([axis_path, axis_path[0]])  # close the loop
+_, idx_blue = get_coil_scoord(rt.coils, axis_path, 'Blue')
+B_ripple, s = get_Bmag_on_axis(rt.coils, axis_path)
+B_ripple = B_ripple[idx_blue[0]:idx_blue[1]]
+s_coord = s[idx_blue[0]:idx_blue[1]]
+B_peaks = find_peaks(B_ripple)[0]
+B_trough = find_peaks(-B_ripple)[0]
 
-
-# blue_scoord, idx_4panS = get_coil_scoord(rt.coils, axis_path, '4panS')
-# print(f"4panS coil s-coordinates: {blue_scoord}")
-# B_ripple, scoord = get_Bmag_on_axis(rt.coils, axis_path)
-# B_ripple = B_ripple[idx_4panS[1]:idx_4panS[2]]
-# plt.plot(scoord[idx_4panS[1]:idx_4panS[2]], B_ripple, label='4panS Coil B-field', linestyle='-', color='purple')
-# ripple = (B_ripple.max() - B_ripple.min()) / B_ripple.mean()
-# print(f"Ripple for 4panS coil: {ripple:.2%}")
-# plt.xlabel('s (m)')
-# plt.ylabel('|B| (T)')
+ripple = (B_ripple[B_peaks].max() - B_ripple[B_trough].min()) / B_ripple.max()
+print('ripple = ', ripple)
 
 plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
 
     coil_colors = {'Brown':'brown', 'L2':'gold', 'Blue':'blue',
                'BlueCenter':'red', 'BlueInner': 'violet', 'OM':'green', 'LaniCenter':'pink', 'LCenter':'pink',
-                 'Lani':'gray', 'L':'gray', '3pan':'gold', '6pan':'black', '6panCenter':'gold',
-                 '2panBu': 'Cyan', '2panBuCenter': 'magenta', '2panBuOut': 'orange'}
+                 'Lani':'gray', 'L':'gray', '3pan':'gold', 'LaniInner': 'orange', 
+                 'LaniPP': '#BB00F5', 'LaniPPInner': '#ED00F5', 'LaniPPCenter': '#F5007B'}
     # Array of 3 plots using GridSpec
     fig = plt.figure(figsize=(16, 8), constrained_layout=True)
     # 2 rows × 3 cols:
@@ -133,3 +153,10 @@ if plot.lower() == 'y':
     ax_contour.legend()
     ax_blank.legend()
     plt.show()
+
+    save = input("Do you want to save the figure? (y/n): ")
+    if save.lower() == 'y':
+        counter = 1
+        while os.path.exists(f'../racetrack_images/racetrack_{counter}.png'):
+            counter += 1
+        fig.savefig(f'../racetrack_images/racetrack_{counter}.png', dpi=300)
