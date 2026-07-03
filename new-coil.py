@@ -3,7 +3,7 @@ import pandas
 import numpy as np
 from field import *
 
-typ = 'Lani_1pp'
+typ = 'LaniPP'
 ID= 0.30
 Nr = 10
 Nz= 4

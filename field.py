@@ -279,6 +279,19 @@ _, axis_path = get_coil_info(filename, interpolate=False, L=Mirror_Length, R=Ste
             print(f"  {self.type}: {V_coil:.4f} m^3")
         return V_coil
 
+    def get_scoord(self, axis_path):
+
+        '''Returns this coil's s-coordinate and closest axis index.'''
+        axis_path = np.asarray(axis_path, dtype=float)
+        if axis_path.ndim != 2 or axis_path.shape[1] != 2:
+            raise ValueError("axis_path must have shape (N, 2)")
+
+        coil_pos = np.array([self.Xc, self.Yc], dtype=float)
+        distances = np.linalg.norm(axis_path - coil_pos, axis=1)
+        closest_idx = int(np.argmin(distances))
+        s_coord = float(cumulative_distance(axis_path)[closest_idx])
+        return s_coord, closest_idx
+
 
 def interpolate_axis(points, samples_per_segment=AXIS_SAMPLES_PER_SEGMENT, loop = True):
     """Linearly interpolate between COM points to approximate the magnetic axis."""
@@ -491,7 +504,7 @@ def axis_field_plot(ax, coils, axis_path, show_labels=True, plasma_rad = True, l
     else:
         ax.plot(s_coord, B_mag, lw=2, color=color, label=label)
 
-    const = 4/1.3
+    const = 4
     ax_rad = ax.twinx()
     if plasma_rad:
         ax_rad.plot(s_coord, const/np.sqrt(B_mag), color='green', label='Plasma Radius')

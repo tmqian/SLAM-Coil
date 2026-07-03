@@ -7,9 +7,10 @@ from optimize_ripple import Optimize
 
 straight_types = ["Brown", "OM","OMCenter","OM", "Brown"]
 #center_types = ['Blue', 'Lani1', 'Lani2', 'BlueInner', 'LaniCenter1', 'LaniCenter2', 'BlueCenter', 'LaniCenter2', 'LaniCenter1', 'BlueInner', 'Lani2', 'Lani1', 'Blue']
-center_types = ['Blue', 'L1', 'L2', 'BlueInner', 'LCenter1', 'LCenter2', 'BlueCenter', 'LCenter2', 'LCenter1', 'BlueInner', 'L2', 'L1', 'Blue']
+#center_types = ['Blue', 'L1', 'L2', 'BlueInner', 'LCenter1', 'LCenter2', 'BlueCenter', 'LCenter2', 'LCenter1', 'BlueInner', 'L2', 'L1', 'Blue']
 #center_types = ['Blue', 'Lani', 'LaniInner1', 'BlueInner', 'LaniInner2', 'LaniCenter', 'BlueCenter', 'LaniCenter', 'LaniInner2', 'BlueInner', 'LaniInner1', 'Lani', 'Blue']
-# center_types = ['Blue', 'LaniPP', 'LaniPPInner1','BlueInner', 'LaniPPInner2', 'LaniPPCenter', 'BlueCenter', 'LaniPPCenter', 'LaniPPInner2', 'BlueInner', 'LaniPPInner1', 'LaniPP', 'Blue']
+#center_types = ['Blue', 'LaniPP', 'LaniPPInner1','BlueInner', 'LaniPPInner2', 'LaniPPCenter', 'BlueCenter', 'LaniPPCenter', 'LaniPPInner2', 'BlueInner', 'LaniPPInner1', 'LaniPP', 'Blue']
+center_types = ['RBlue', 'L1', 'L2', 'RBlue', 'L1', 'L2', 'Blue', 'L1', 'L2', 'RBlue', 'L1', 'L2', 'RBlue']
 
 
 conv_types = None
@@ -41,10 +42,10 @@ rt = Racetrack(Mirror_Length,
 rt.Blue90 = True
 rt.build_coils()
 if optimize:
-    Optimize(plot=True, rt=rt, coil_ref='Blue', coil_idx=0, target_B=0.25)
+    Optimize(plot=True, rt=rt, coil_ref='RBlue', coil_idx=0, target_B=0.25, current_per_type=True)
 
-for coil in rt.coils:
-    coil.current = coil.current/1.3
+# for coil in rt.coils:
+#     coil.current = coil.current/1.3
 
 
 
@@ -66,15 +67,14 @@ with open('ports.csv', 'w', newline='') as csvfile:
 coils = rt.coils
 axis_path = rt.axis_path
 
-_, idx_blue = get_coil_scoord(rt.coils, axis_path, 'Blue')
-B_ripple, s = get_Bmag_on_axis(rt.coils, axis_path)
-B_ripple = B_ripple[idx_blue[0]:idx_blue[1]]
-s_coord = s[idx_blue[0]:idx_blue[1]]
-B_peaks = find_peaks(B_ripple)[0]
-B_trough = find_peaks(-B_ripple)[0]
+_, idx_blue = get_coil_scoord(rt.coils, axis_path, 'RBlue')
+B_ripple, _ = get_Bmag_on_axis(rt.coils, axis_path)
+B_ripple = B_ripple[idx_blue[0]:idx_blue[3]]
+idx_p = find_peaks(B_ripple)[0]
+idx_t = find_peaks(-B_ripple)[0]
 
-ripple = (B_ripple[B_peaks].max() - B_ripple[B_trough].min()) / B_ripple.max()
-print('ripple = ', ripple)
+ripple = (B_ripple[idx_p].max() - B_ripple[idx_t].min()) / B_ripple.max()
+print(f'ripple = {ripple:.2%}')
 
 plot = input("Do you want to plot the racetrack? (y/n): ")
 if plot.lower() == 'y':
@@ -82,7 +82,7 @@ if plot.lower() == 'y':
     coil_colors = {'Brown':'brown', 'L2':'gold', 'Blue':'blue',
                'BlueCenter':'red', 'BlueInner': 'violet', 'OM':'green', 'LaniCenter':'pink', 'LCenter':'pink',
                  'Lani':'gray', 'L':'gray', '3pan':'gold', 'LaniInner': 'orange', 
-                 'LaniPP': '#BB00F5', 'LaniPPInner': '#ED00F5', 'LaniPPCenter': '#F5007B'}
+                 'LaniPP': '#BB00F5', 'LaniPPInner': '#ED00F5', 'LaniPPCenter': '#F5007B', 'RBlue':"#FF0404",}
     # Array of 3 plots using GridSpec
     fig = plt.figure(figsize=(16, 8), constrained_layout=True)
     # 2 rows × 3 cols:
@@ -141,15 +141,13 @@ if plot.lower() == 'y':
             coil.type = coil.type[:-5]
     axis_field_plot_by_coil(ax_blank, coils, axis_path, coil_colors=coil_colors)
 
-    brown_locations = np.array([0.15+toroid_trans, 1.5-0.15+toroid_trans, 1.5+np.pi*0.5+0.15+toroid_trans*3, 1.5+np.pi*0.5+1.5-0.15+toroid_trans*3])
-    brown_edges = np.concatenate((brown_locations-0.0443, brown_locations+0.0443))
-    for i in range(len(brown_edges)-1):
-        ax_axis.axvline(x=brown_edges[i+1], ls='--', color='brown', lw=1)
-        ax_blank.axvline(x=brown_edges[i+1], ls='--', color='brown', lw=1)
+    for coil in coils:
+        s_coord, _ = coil.get_scoord(axis_path)
+        edge1 = s_coord - coil.DZ/2
+        edge2 = s_coord + coil.DZ/2
+        ax_axis.axvspan(edge1, edge2, color=coil_colors.get(coil.type, 'gray'), alpha=0.1)
+        ax_blank.axvspan(edge1, edge2, color=coil_colors.get(coil.type, 'gray'), alpha=0.1)
 
-    ax_axis.axvline(x=brown_edges[0], ls='--', color='brown', lw=1, label='Brown Coil Edges')
-    ax_blank.axvline(x=brown_edges[0], ls='--', color='brown', lw=1, label='Brown Coil Edges')
-    ax_axis.legend(loc='lower left')
     ax_contour.legend()
     ax_blank.legend()
     plt.show()

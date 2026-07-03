@@ -51,7 +51,7 @@ class Racetrack:
     def build_coils(self):
         self.coils = []
 
-        def add(x, y, angle_rad, ctype, id = 0, group = None):
+        def add(x, y, angle_rad, ctype, id = 0):
             self.coils.append(Coil(x, y, math.degrees(angle_rad), ctype))
             self.coils[-1].id = id
 
@@ -62,14 +62,16 @@ class Racetrack:
         num_straight = len(self.straight_types)   
         mx = midpoints(-self.Mirror_Length/2, self.Mirror_Length/2, num_straight)
 
-        # 1. TOP STRAIGHT: left → right
+        #----------------------------------------------------------
+        # 1. TOP STRAIGHT:
+        #----------------------------------------------------------
         for x, ctype in zip(mx, self.straight_types):
             match = re.search(r"\d+$", ctype)
             id = int(match.group()) if match else 0
             typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
         
             add(x, self.Stellerator_Radius + self.mirror_shift, math.pi/2, f"{typ_base}", id = id)
-
+        #----------------------------------------------------------
         # 3. BOTTOM STRAIGHT
         # ---------------------------------------------------------
         for x, ctype in zip(mx[::-1], self.straight_types):
@@ -112,16 +114,6 @@ class Racetrack:
                 add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
 
         # ---------------------------------------------------------
-        # 3. BOTTOM STRAIGHT
-        # ---------------------------------------------------------
-        for x, ctype in zip(mx[::-1], self.straight_types):
-            match = re.search(r"\d+$", ctype)
-            id = int(match.group()) if match else 0
-            typ_base = re.sub(r"\d+$", "", ctype) if match else ctype
-            add(x, -self.Stellerator_Radius - self.mirror_shift, -math.pi/2, f"{typ_base}", id = id)
-
-
-        # ---------------------------------------------------------
         # CURVED SECTIONS:
         # ---------------------------------------------------------
         
@@ -159,21 +151,11 @@ class Racetrack:
             match = re.search(r"\d+$", typ)
             id = int(match.group()) if match else 0
             typ_base = re.sub(r"\d+$", "", typ) if match else typ
-
-            if "Inner" in typ_base:
-                group = "inner"
-                typ_base = re.sub(r"(?i)inner", "", typ_base)
-            elif "Center" in typ_base:
-                group = "center"
-                typ_base = re.sub(r"(?i)center", "", typ_base)
-            elif "Outer" in typ_base:
-                group = "outer"
-                typ_base = re.sub(r"(?i)outer", "", typ_base)
             
             add(-cx - self.Stellerator_Radius*math.cos(t_center),
                     self.Stellerator_Radius*math.sin(t_center),
                     np.pi - t_center,
-                    f"{typ_base}", id = id, group=group)
+                    f"{typ_base}", id = id)
             
         #shift coils in sstraight sections if needed
         for coil in self.coils:
