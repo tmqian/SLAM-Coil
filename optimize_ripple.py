@@ -5,8 +5,7 @@ from scipy.optimize import least_squares
 
 def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target_B: float = 0.25, current_per_type: bool = False):
     axis_path = rt.axis_path
-    B_mag, s_coord = get_Bmag_on_axis(rt.coils, axis_path)
-    _, idx_ends = get_coil_scoord(rt.coils, axis_path, coil_ref)    
+    B_mag, s_coord = get_Bmag_on_axis(rt.coils, axis_path) 
 
     
     def get_symmetric_group(coil, all_coils):
@@ -20,20 +19,41 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
                 group.add(other)
         return group
 
-    def B_field(s, currents):
+    first_quad_coils = [c for c in rt.coils if c.type in rt.center_types and c.Xc > 0 and c.Yc >= 0]
 
+    # Preserve deterministic order from the actual coil list.
+    ordered_types = []
+    for coil in rt.coils:
+        if coil.type in rt.center_types and coil.type not in ordered_types:
+            ordered_types.append(coil.type)
+
+    if current_per_type:
+        opt_labels = ordered_types
+        initial_guess = np.array([
+            next(c.current for c in rt.coils if c.type == typ)
+            for typ in opt_labels
+        ], dtype=float)
+    else:
+        opt_labels = first_quad_coils
+        initial_guess = np.array([coil.current for coil in first_quad_coils], dtype=float)
+
+    lower_bounds = np.zeros(len(opt_labels), dtype=float)
+    upper_bounds = np.full(len(opt_labels), 1500.0, dtype=float)
+
+    def apply_currents(currents):
         if current_per_type:
-            unique_types = sorted(list(set([c.type for c in rt.coils if c.type in rt.center_types])))
-            for typ, I in zip(unique_types, currents):
+            for typ, I in zip(opt_labels, currents):
                 for coil in rt.coils:
                     if coil.type == typ:
-                        coil.current = I
-        else: 
-            first_quad_coils = [c for c in rt.coils if c.type in rt.center_types and c.Xc > 0 and c.Yc >= 0]
-            for (coil, I) in zip(first_quad_coils, currents):
+                        coil.current = float(I)
+        else:
+            for coil, I in zip(opt_labels, currents):
                 group = get_symmetric_group(coil, rt.coils)
                 for symmetric_coil in group:
-                    symmetric_coil.current = I
+                    symmetric_coil.current = float(I)
+
+    def B_field(s, currents):
+        apply_currents(currents)
 
         B_mag, _ = get_Bmag_on_axis(rt.coils, axis_path)
 
@@ -53,10 +73,6 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
         target_B = np.full_like(B_region, target_value)
         return B_region - target_B
 
-    lower_bounds = np.zeros(len([coil for coil in rt.coils if coil.type in rt.center_types and coil.Xc > 0 and coil.Yc >= 0]))
-    upper_bounds = np.full(len([coil for coil in rt.coils if coil.type in rt.center_types and coil.Xc > 0 and coil.Yc >= 0]), 1500.0)
-    initial_guess = np.array([coil.current for coil in rt.coils if coil.type in rt.center_types and coil.Xc > 0 and coil.Yc >= 0])
-
     #----------------"real time" plotting----------------
     it_counter = 0
     def plot_callback(xk):
@@ -65,13 +81,7 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
 
         B_mag, _ = get_Bmag_on_axis(rt.coils, axis_path)
         itteration_line.set_ydata(B_mag)
-        peak_idx, _ = find_peaks(B_mag[idx_ends[0]:idx_ends[1]])
-        trough_idx, _ = find_peaks(-B_mag[idx_ends[0]:idx_ends[1]])
-        if len(peak_idx) > 0 and len(trough_idx) > 0:
-            ripple = (np.max(B_mag[idx_ends[0]:idx_ends[1]][peak_idx]) - np.min(B_mag[idx_ends[0]:idx_ends[1]][trough_idx])) / np.max(B_mag[idx_ends[0]:idx_ends[1]])
-        else:
-            ripple = 0.0
-        ax.set_title(f"Iteration {it_counter}, Ripple: {ripple:.4%}")
+        ax.set_title(f"Iteration {it_counter}")
         fig.canvas.draw()
         fig.canvas.flush_events()
 
@@ -92,9 +102,19 @@ def Optimize(plot: bool, rt: Racetrack, coil_ref: str, coil_idx: int = 0, target
         plt.legend()
         plt.show()
 
-        optimized_currents = result.x
-        optimization = {coil.type: float(I) for coil, I in zip([coil for coil in rt.coils if coil.type in rt.center_types and coil.Xc > 0 and coil.Yc >= 0], optimized_currents)}
-        print(f"Optimized currents: {optimization}")
-
     else:   
         result = least_squares(residuals, initial_guess, bounds=(lower_bounds, upper_bounds), args=(target_B,))
+
+    # Ensure the coil objects hold the optimized values after solver termination.
+    apply_currents(result.x)
+
+    if current_per_type:
+        optimization = {typ: float(I) for typ, I in zip(opt_labels, result.x)}
+    else:
+        optimization = {
+            f"{coil.type}[{idx}]": float(I)
+            for idx, (coil, I) in enumerate(zip(opt_labels, result.x))
+        }
+
+    print(f"Optimized currents: {optimization}")
+    return result

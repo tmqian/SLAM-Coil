@@ -9,8 +9,8 @@ straight_types = ["Brown", "OM","OMCenter","OM", "Brown"]
 #center_types = ['Blue', 'Lani1', 'Lani2', 'BlueInner', 'LaniCenter1', 'LaniCenter2', 'BlueCenter', 'LaniCenter2', 'LaniCenter1', 'BlueInner', 'Lani2', 'Lani1', 'Blue']
 #center_types = ['Blue', 'L1', 'L2', 'BlueInner', 'LCenter1', 'LCenter2', 'BlueCenter', 'LCenter2', 'LCenter1', 'BlueInner', 'L2', 'L1', 'Blue']
 #center_types = ['Blue', 'Lani', 'LaniInner1', 'BlueInner', 'LaniInner2', 'LaniCenter', 'BlueCenter', 'LaniCenter', 'LaniInner2', 'BlueInner', 'LaniInner1', 'Lani', 'Blue']
-#center_types = ['Blue', 'LaniPP', 'LaniPPInner1','BlueInner', 'LaniPPInner2', 'LaniPPCenter', 'BlueCenter', 'LaniPPCenter', 'LaniPPInner2', 'BlueInner', 'LaniPPInner1', 'LaniPP', 'Blue']
-center_types = ['RBlue', 'L1', 'L2', 'RBlue', 'L1', 'L2', 'Blue', 'L1', 'L2', 'RBlue', 'L1', 'L2', 'RBlue']
+# center_types = ['RBlue', 'LaniPP1', 'LaniPP2','RBlue', 'LaniPP1', 'LaniPP2', 'Blue', 'LaniPP2', 'LaniPP1', 'RBlue', 'LaniPP2', 'LaniPP1', 'RBlue']
+center_types = ['RBlue', 'L1', 'L2', 'RBlue', 'L1', 'L2', 'Blue', 'L2', 'L1', 'RBlue', 'L2', 'L1', 'RBlue']
 
 
 conv_types = None
@@ -25,7 +25,7 @@ cd = {'Blue': 0, 'L1':-disp_angle, 'L2':disp_angle, 'L3':disp_angle, 'LCenter1':
       'Lani':-disp_angle, 'LaniInner1':disp_angle, 'LaniInner2':-disp_angle, 'LaniCenter':disp_angle}
 
 toroid_trans = 0.04
-optimize = False
+optimize = True
 
 cd = {'Blue': 0, 'L1':-disp_angle, 'L2':disp_angle, 'L3':disp_angle, 'LCenter1':-disp_angle, 'LCenter2':disp_angle, 'LCenter3':disp_angle,
     'Lani1':-disp_angle, 'Lani2':disp_angle, 'LaniCenter1':-disp_angle, 'LaniCenter2':disp_angle,
@@ -42,7 +42,7 @@ rt = Racetrack(Mirror_Length,
 rt.Blue90 = True
 rt.build_coils()
 if optimize:
-    Optimize(plot=True, rt=rt, coil_ref='RBlue', coil_idx=0, target_B=0.25, current_per_type=True)
+    Optimize(plot=True, rt=rt, coil_ref='L', coil_idx=2, target_B=0.25, current_per_type=True)
 
 # for coil in rt.coils:
 #     coil.current = coil.current/1.3
