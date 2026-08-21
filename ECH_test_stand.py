@@ -1,10 +1,11 @@
 # pyright: standard
 import matplotlib.pyplot as plt
 import numpy as np
+from pandas.compat.pyarrow import pa_version_under14p0
 
 from field import get_coil_info
 
-CURRENT = 250  # Amps
+CURRENTS = np.linspace(100, 500, 5)  # Amps
 THRESHOLD = 875.0  # Gauss
 COIL_WIDTH = 0.076
 VESSEL_WIDTH = 0.205  # 20.5 cm
@@ -21,12 +22,39 @@ axis_points_x = np.linspace(-1, 1, 201)
 axis_points = np.column_stack(
     [axis_points_x, np.zeros_like(axis_points_x), np.zeros_like(axis_points_x)]
 )
-B_field = np.zeros_like(axis_points)
-for coil in coils:
-    # For each coil, compute the field at each poing and sum them
-    B_field += coil.magnetic_field(axis_points, CURRENT)
 
-B_mag = np.linalg.norm(B_field, axis=1)
+B_mags = []
+for current in CURRENTS:
+    B_field = np.zeros_like(axis_points)  # Initialize field array
+    for coil in coils:
+        # For each coil, compute the field at each point and sum them
+        B_field += coil.magnetic_field(axis_points, current)
+    B_mag = np.linalg.norm(B_field, axis=1)
+    B_mags.append(B_mag)
+
+
+# --- NEW CODE: Calculate Mirror Ratio ---
+# Use the field from the first current for mirror ratio calculation since it only depends on the geometry
+# Find local maxima in the field to identify the extrema coils
+bm0 = B_mags[0]
+diffs = np.diff(bm0)
+is_max = (diffs[:-1] > 0) & (diffs[1:] < 0)
+maxima_idxs = np.where(is_max)[0] + 1
+
+if len(maxima_idxs) >= 2:
+    # Slice the region between the left-most and right-most maxima
+    left_peak = maxima_idxs[0]
+    right_peak = maxima_idxs[-1]
+    B_min = np.min(bm0[left_peak : right_peak + 1])
+    B_max = np.max(bm0)  # Overall maximum field
+    mirror_ratio = B_max / B_min
+else:
+    # Fallback just in case the field doesn't have distinct multiple peaks
+    B_min = np.min(bm0)
+    B_max = np.max(bm0)
+    mirror_ratio = B_max / B_min if B_min > 0 else float("inf")
+# ----------------------------------------
+
 fig, ax = plt.subplots(figsize=(12, 4.5))
 
 # Shade vacuum vessel region centered on x=0
@@ -54,11 +82,11 @@ for i, coil in enumerate(coils):
         zorder=0,
         label="Coil width" if i == 0 else None,
     )
-
-ax.plot(axis_points_x, B_mag * 10000, color="blue", zorder=2, label="|B| on axis")
+for current, B_mag in zip(CURRENTS, B_mags):
+    ax.plot(axis_points_x, B_mag * 10000, zorder=2, label="|B| on axis")
 
 # Mark threshold crossings
-y = B_mag * 10000
+y = bm0 * 10000
 ax.axhline(
     THRESHOLD,
     color="red",
@@ -95,8 +123,11 @@ vessel_left = VESSEL_CENTER_X - VESSEL_WIDTH / 2
 vessel_right = VESSEL_CENTER_X + VESSEL_WIDTH / 2
 info_lines = [
     r"$\mathbf{Setup}$",
-    f"Current: {CURRENT:.0f} A",
+    f"Currents: {', '.join([f'{c:.0f}' for c in CURRENTS])} A",
     f"Threshold: {THRESHOLD:.0f} G",
+    f"Max B: {B_max * 10000:.1f} G",
+    f"Min B: {B_min * 10000:.1f} G",
+    f"Mirror Ratio: {mirror_ratio:.2f}",  # Output formatted to 2 decimal places
     "",
     r"$\mathbf{Geometry}$",
     f"Vessel: {vessel_left:.4f} to {vessel_right:.4f} m",
